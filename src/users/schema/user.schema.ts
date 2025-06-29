@@ -2,10 +2,14 @@ import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { UserRole } from './role.enum';
 
-@Schema()
-export class User {
+@Schema({timestamps: true })
+
+export class User extends Document  {
   @Prop({ required: true })
-  name: string;
+  firstName: string;
+
+  @Prop({ required: true })
+  lastName: string;
 
   @Prop({ required: true, unique: true })
   email: string;
@@ -24,11 +28,17 @@ export class User {
 
   @Prop({ type: Types.ObjectId, ref: 'Site' })
   assignedSite: Types.ObjectId;
+
+  @Prop()
+  workerCode: string
+
   @Prop({ default: true })
   isActive: boolean;
 
   
+
+  
 }
 
-export type UserDocument = User & Document;
+
 export const UserSchema = SchemaFactory.createForClass(User);
