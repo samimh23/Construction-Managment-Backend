@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from "@nestjs/mongoose";
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
+import { User } from "src/users/schema/user.schema";
 
 @Schema()
 export class ConstructionSite extends Document
@@ -14,9 +15,21 @@ export class ConstructionSite extends Document
  GeoFence? : {center : { longitude : string ; Latitude : string}; radius : string};
  @Prop()
  StartDate : Date;
+ 
  @Prop()
  EndDate : Date;
+
  @Prop()
  Budget : string;
+
+ @Prop()
+ isActive:boolean;
+
+ @Prop({ type: Types.ObjectId, ref: 'User', required: true })
+  owner: User;
+
+  // 🔗 Add manager (user)
+  @Prop({ type: Types.ObjectId, ref: 'User' })
+  manager: User;
 }
 export const ConstructionSiteSchema = SchemaFactory.createForClass(ConstructionSite)

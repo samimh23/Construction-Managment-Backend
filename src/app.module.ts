@@ -44,7 +44,7 @@ import { JwtModule } from '@nestjs/jwt';
       inject: [ConfigService],
     }),
     
-      ,AuthModule, UsersModule],
+      AuthModule, UsersModule],
     controllers: [AppController],
     providers: [AppService],
   })
