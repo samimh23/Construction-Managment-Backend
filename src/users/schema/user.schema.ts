@@ -35,6 +35,9 @@ export class User extends Document  {
   @Prop({ default: true })
   isActive: boolean;
 
+  @Prop()
+  refreshToken: string;
+
   
 
   

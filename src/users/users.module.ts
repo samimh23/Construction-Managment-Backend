@@ -16,6 +16,7 @@ import { ConstructionSite, ConstructionSiteSchema } from 'src/construction_sites
   ],
   controllers: [UsersController],
   providers: [UsersService],
+  exports: [UsersService]
   
 })
 export class UsersModule {}

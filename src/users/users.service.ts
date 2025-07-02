@@ -17,7 +17,7 @@ export class UsersService {
     ) {}
 
 async createConstructionOwner (CreateownerDto:any):Promise<User>{
-  const userexists= await this.userModel.find({email:CreateownerDto.email})
+  const userexists= await this.userModel.findOne({email:CreateownerDto.email})
   if(userexists){
       throw new ConflictException('User with this email already exists');
   }
@@ -36,6 +36,30 @@ async createConstructionOwner (CreateownerDto:any):Promise<User>{
 
 
 }
+
+ async addCredentialsToWorker(workerId: string, email: string, password: string, ownerId: string): Promise<User> {
+    const worker = await this.userModel.findOne({
+      _id: workerId,
+      createdBy: ownerId,
+      role: UserRole.WORKER,
+    });
+
+    if (!worker) {
+      throw new NotFoundException('Worker not found');
+    }
+
+    // Check if email already exists
+    const existingUser = await this.userModel.findOne({ email });
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    worker.email = email;
+    worker.password = hashedPassword;
+
+    return worker.save();
+  }
 
 async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promise<User> {
     if (!siteId) {
@@ -196,5 +220,18 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
         isActive:true}).exec();
           
         }
+
+        // Add this method to your UsersService
+async updateRefreshToken(userId: string, refreshToken: string) {
+  await this.userModel.findByIdAndUpdate(userId, { refreshToken });
+}
+
+async findByEmail(email: string): Promise<User | null> {
+  return this.userModel.findOne({ email }).exec();
+}
+
+async findById(id: string): Promise<User | null> {
+  return this.userModel.findById(id).exec();
+}
   }
 

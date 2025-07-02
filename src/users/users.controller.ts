@@ -3,7 +3,9 @@ import { UsersService } from './users.service';
 import { UserRole } from './schema/role.enum';
 import { RolesGuard } from 'src/config/guards/role.guard';
 import { Roles } from 'src/config/decorators/role.decorators';
-
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+@ApiTags('users')
+@ApiBearerAuth()
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -53,7 +55,7 @@ async registerowner(@Body() CreateOwnerDto: any){
     return this.usersService.findWorkersBySite(siteId);
   }
 
-  @UseGuards( RolesGuard)
+  @UseGuards(RolesGuard)
   @Get('managers-with-sites')
   @Roles(UserRole.OWNER)
   async getManagersWithSites(@Req() req) {
