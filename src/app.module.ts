@@ -10,6 +10,7 @@
   import config from './config/config';
   import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
+import { ConstructionSitesModule } from './construction_sites/construction_sites.module';
 
   @Module({
     imports: [ConfigModule.forRoot({
@@ -42,9 +43,9 @@ import { JwtModule } from '@nestjs/jwt';
         };
       },
       inject: [ConfigService],
-    }),
+    })
     
-      ,AuthModule, UsersModule],
+      ,AuthModule, UsersModule,ConstructionSitesModule],
     controllers: [AppController],
     providers: [AppService],
   })
