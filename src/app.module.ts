@@ -4,12 +4,13 @@
   import { AppService } from './app.service';
 
 
-  import { AuthModule } from './auth/auth.module';
   import { UsersModule } from './users/users.module';
   import { ConfigModule, ConfigService } from '@nestjs/config';
   import config from './config/config';
   import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
+import { ConstructionSitesModule } from './construction_sites/construction_sites.module';
+import { AuthModule } from './auth/auth.module';
 
   @Module({
     imports: [ConfigModule.forRoot({
@@ -42,9 +43,9 @@ import { JwtModule } from '@nestjs/jwt';
         };
       },
       inject: [ConfigService],
-    }),
+    })
     
-      AuthModule, UsersModule],
+      ,AuthModule, UsersModule,ConstructionSitesModule],
     controllers: [AppController],
     providers: [AppService],
   })
