@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, Put, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, ForbiddenException, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UserRole } from './schema/role.enum';
 import { RolesGuard } from 'src/config/guards/role.guard';
@@ -38,7 +38,7 @@ async registerowner(@Body() CreateOwnerDto: any){
   @UseGuards(RolesGuard)
   @Put('promote/:workerId/site/:siteId')
   @Roles(UserRole.OWNER)
-  async promoteWorker(@Param('workerId') workerId: string, @Param('siteId') siteId: string, @Req() req) {
+  async promoteWorkertoMangaer(@Param('workerId') workerId: string, @Param('siteId') siteId: string, @Req() req) {
     const ownerId = req.user.sub;
     return this.usersService.promoteToManager(workerId, siteId, ownerId);
   }
@@ -54,6 +54,13 @@ async registerowner(@Body() CreateOwnerDto: any){
     }
     return this.usersService.findWorkersBySite(siteId);
   }
+@UseGuards(RolesGuard)
+   @Get('by-owner')
+   @Roles(UserRole.OWNER)
+  async getWorkersByOwner( @Req() req) {
+    const ownerId = req.user.sub;
+    return this.usersService.getWorkersByOwner(ownerId);
+  }
 
   @UseGuards(RolesGuard)
   @Get('managers-with-sites')
@@ -62,6 +69,18 @@ async registerowner(@Body() CreateOwnerDto: any){
     const ownerId = req.user.sub;
     return this.usersService.getManagersWithSites(ownerId);
   }
+
+  @UseGuards(RolesGuard)
+@Put('assign-worker/:workerId/site/:siteId')
+@Roles(UserRole.OWNER)
+async assignWorkerToSite(
+  @Param('workerId') workerId: string,
+  @Param('siteId') siteId: string,
+  @Req() req,
+) {
+  const ownerId = req.user.sub;
+  return this.usersService.assignWorkerToSite(workerId, siteId, ownerId);
+}
 }
 
 

@@ -24,7 +24,7 @@ export class AuthService {
 
   async login(user: any) {
     const payload = { email: user.email, sub: user._id, role: user.role };
-    const access_token = this.jwtService.sign(payload, { expiresIn: '15m' });
+    const access_token = this.jwtService.sign(payload);
     // Create refresh token
     const refreshPayload = { sub: user._id };
     const refresh_token = this.jwtService.sign(
@@ -42,43 +42,6 @@ export class AuthService {
     };
   }
 
-  async tabletLogin(code: string) {
-    const accessCode = await this.codesService.validateCode(code);
-    if (!accessCode) {
-      throw new UnauthorizedException('Invalid or expired code');
-    }
-
-    // Make sure findById exists on UsersService
-    const manager = await this.usersService.findById(String(accessCode.manager));
-    if (!manager) {
-      throw new UnauthorizedException('Manager not found');
-    }
-
-    // Mark code as used (ensure markCodeAsUsed expects a string)
-    await this.codesService.markCodeAsUsed(String(accessCode._id));
-
-    const payload = { 
-      email: manager.email, 
-      sub: manager._id, 
-      role: manager.role,
-      siteId: accessCode.site 
-    };
-
-    const access_token = this.jwtService.sign(payload, { expiresIn: '15m' });
-    const refreshPayload = { sub: manager._id };
-    const refresh_token = this.jwtService.sign(
-      refreshPayload,
-      { expiresIn: '7d', secret: process.env.JWT_REFRESH_SECRET }
-    );
-
-await this.usersService.updateRefreshToken(String(manager._id), refresh_token);
-    return {
-      access_token,
-      refresh_token,
-      user: manager,
-      site: accessCode.site,
-    };
-  }
 
   async refreshToken(userId: string, refreshToken: string) {
     // Make sure findById exists on UsersService

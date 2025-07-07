@@ -11,11 +11,20 @@ export class User extends Document  {
   @Prop({ required: true })
   lastName: string;
 
-  @Prop({ required: true, unique: true })
-  email: string;
+  @Prop({
+  required: function(this: any) {
+    return this.role !== UserRole.WORKER;
+  },
+  
+})
+email: string;
 
-  @Prop({ required: true })
-  password: string; // Stored as hash
+@Prop({
+  required: function(this: any) {
+    return this.role !== UserRole.WORKER;
+  },
+})
+password: string;
 
   @Prop()
   phonenumber:string;

@@ -1,26 +1,47 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { Model } from 'mongoose';
+import { ConstructionSite } from './schemas/construction_site.schema';
 import { CreateConstructionSiteDto } from './dto/create-construction_site.dto';
 import { UpdateConstructionSiteDto } from './dto/update-construction_site.dto';
 
 @Injectable()
 export class ConstructionSitesService {
-  create(createConstructionSiteDto: CreateConstructionSiteDto) {
-    return 'This action adds a new constructionSite';
+  constructor(
+    @InjectModel(ConstructionSite.name)
+    private readonly constructionSiteModel: Model<ConstructionSite>
+  ) {}
+
+  async create(createConstructionSiteDto: CreateConstructionSiteDto): Promise<ConstructionSite> {
+    const createdSite = new this.constructionSiteModel(createConstructionSiteDto);
+    return createdSite.save();
   }
 
-  findAll() {
-    return `This action returns all constructionSites`;
+  async findAll(): Promise<ConstructionSite[]> {
+    return this.constructionSiteModel.find().exec();
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} constructionSite`;
+  async findOne(id: string): Promise<ConstructionSite> {
+    const site = await this.constructionSiteModel.findById(id).exec();
+    if (!site) {
+      throw new NotFoundException(`ConstructionSite #${id} not found`);
+    }
+    return site;
   }
 
-  update(id: number, updateConstructionSiteDto: UpdateConstructionSiteDto) {
-    return `This action updates a #${id} constructionSite`;
+  async update(id: string, updateConstructionSiteDto: UpdateConstructionSiteDto): Promise<ConstructionSite> {
+    const updatedSite = await this.constructionSiteModel.findByIdAndUpdate(id, updateConstructionSiteDto, { new: true }).exec();
+    if (!updatedSite) {
+      throw new NotFoundException(`ConstructionSite #${id} not found`);
+    }
+    return updatedSite;
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} constructionSite`;
+  async remove(id: string): Promise<ConstructionSite> {
+    const deletedSite = await this.constructionSiteModel.findByIdAndDelete(id).exec();
+    if (!deletedSite) {
+      throw new NotFoundException(`ConstructionSite #${id} not found`);
+    }
+    return deletedSite;
   }
 }

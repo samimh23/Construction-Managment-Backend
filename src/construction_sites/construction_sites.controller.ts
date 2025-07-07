@@ -19,16 +19,16 @@ export class ConstructionSitesController {
 
   @Get(':id')
   findOne(@Param('id') id: string) {
-    return this.constructionSitesService.findOne(+id);
+    return this.constructionSitesService.findOne(id);
   }
 
   @Patch(':id')
   update(@Param('id') id: string, @Body() updateConstructionSiteDto: UpdateConstructionSiteDto) {
-    return this.constructionSitesService.update(+id, updateConstructionSiteDto);
+    return this.constructionSitesService.update(id, updateConstructionSiteDto);
   }
 
   @Delete(':id')
   remove(@Param('id') id: string) {
-    return this.constructionSitesService.remove(+id);
+    return this.constructionSitesService.remove(id);
   }
 }
