@@ -1,7 +1,7 @@
 import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { User,  } from './schema/user.schema';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { promises } from 'dns';
 import { UserRole } from './schema/role.enum';
 import { ConstructionSite } from 'src/construction_sites/Schemas/Construction_Site.schema';
@@ -36,6 +36,49 @@ async createConstructionOwner (CreateownerDto:any):Promise<User>{
 
 
 }
+
+async assignWorkerToSite(workerId: string, siteId: string, ownerId: string): Promise<User> {
+    // Find the worker and verify ownership
+    const worker = await this.userModel.findOne({
+      _id: workerId,
+      createdBy: ownerId,
+      role: UserRole.WORKER,
+      isActive: true,
+    });
+
+    if (!worker) {
+      throw new NotFoundException('Worker not found or not owned by you');
+    }
+
+    // Find the site and verify ownership
+    const site = await this.siteModel.findOne({ _id: siteId, owner: ownerId });
+    if (!site) {
+      throw new NotFoundException('Site not found or not owned by you');
+    }
+
+    // If worker is already assigned to this site
+    if (String(worker.assignedSite) === String(siteId)) {
+      throw new ConflictException('Worker is already assigned to this site');
+    }
+
+    // Optionally: Remove worker from previous site's workers array
+    if (worker.assignedSite) {
+      await this.siteModel.findByIdAndUpdate(worker.assignedSite, {
+        $pull: { workers: worker._id }
+      });
+    }
+
+    // Assign worker to new site
+worker.assignedSite = new Types.ObjectId(siteId);
+    await worker.save();
+
+    // Add worker to site's workers array
+    await this.siteModel.findByIdAndUpdate(siteId, {
+      $addToSet: { workers: worker._id }
+    });
+
+    return worker;
+  }
 
  async addCredentialsToWorker(workerId: string, email: string, password: string, ownerId: string): Promise<User> {
     const worker = await this.userModel.findOne({
@@ -98,6 +141,14 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
     return savedUser;
   }
 
+    async getallworkerbyowner(ownerId:string){
+      const workers= await this.userModel.find({
+        createdBy:ownerId,
+         role:{$in:[UserRole.WORKER,UserRole.CONSTRUCTION_MANAGER]}
+      })
+      return workers;
+    }
+
    private async generateWorkerCode(): Promise<string> {
     const lastWorker = await this.userModel
       .findOne({ role: UserRole.WORKER, workerCode: { $exists: true } })
@@ -113,14 +164,7 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
     return `WRK${nextNumber.toString().padStart(3, '0')}`;
   }
 
-    async findworkerbyname(name:string):Promise<User>{
-      const worker = await this.userModel.findOne({
-        firstName:name,
-        role:{$in:[UserRole.WORKER,UserRole.CONSTRUCTION_MANAGER]}
-      })
-
-      return worker;
-    }
+ 
  
  
       async promoteToManager(workerId: string, siteId: string, ownerId: string): Promise<User> {

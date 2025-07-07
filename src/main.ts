@@ -10,13 +10,18 @@ async function bootstrap() {
     .setTitle('Construction Management API')
     .setDescription('API documentation for the Construction Management system')
     .setVersion('1.0')
-    .addBearerAuth() // If you use JWT auth
+    .addBearerAuth()
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
 
+  // Enable CORS BEFORE listening!
+  app.enableCors({
+    origin: true, // or specify the origin(s) you want to allow
+    credentials: true, // if you use cookies/sessions
+  });
+
   await app.listen(3000);
-  app.enableCors();
 }
 bootstrap();

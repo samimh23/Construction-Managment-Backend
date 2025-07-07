@@ -15,7 +15,7 @@ export class User extends Document  {
   required: function(this: any) {
     return this.role !== UserRole.WORKER;
   },
-  unique: true,
+  
 })
 email: string;
 
