@@ -37,6 +37,33 @@ async createConstructionOwner (CreateownerDto:any):Promise<User>{
 
 }
 
+
+// users.service.ts
+
+async getSiteAndWorkersForManager(managerId: string) {
+  const manager = await this.userModel.findById(managerId);
+  if (!manager || manager.role !== UserRole.CONSTRUCTION_MANAGER) {
+    throw new NotFoundException('Manager not found');
+  }
+  if (!manager.assignedSite) {
+    throw new NotFoundException('Manager is not assigned to a site');
+  }
+  const site = await this.siteModel
+    .findById(manager.assignedSite)
+    .populate('workers')
+    .exec();
+
+  if (!site) throw new NotFoundException('Assigned site not found');
+
+  // Optionally exclude manager from workers array
+  const workers = (site.workers as any[]).filter(w => w.role === UserRole.WORKER);
+
+  return {
+    site,
+    workers,
+  };
+}
+
 async assignWorkerToSite(workerId: string, siteId: string, ownerId: string): Promise<User> {
     // Find the worker and verify ownership
     const worker = await this.userModel.findOne({
