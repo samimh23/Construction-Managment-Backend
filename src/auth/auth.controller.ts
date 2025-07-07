@@ -16,10 +16,7 @@ export class AuthController {
   }
 
   // Tablet login for managers (with code)
-  @Post('tablet-login')
-  async tabletLogin(@Body() body: { code: string }) {
-    return this.authService.tabletLogin(body.code);
-  }
+ 
 
   // Refresh token (if your AuthService implements this)
   @Post('refresh')

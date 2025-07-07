@@ -31,5 +31,8 @@ export class ConstructionSite extends Document
   // 🔗 Add manager (user)
   @Prop({ type: Types.ObjectId, ref: 'User' })
   manager: User;
+
+  @Prop({ type: [{ type: Types.ObjectId, ref: 'User' }], default: [] })
+  workers: User[];
 }
 export const ConstructionSiteSchema = SchemaFactory.createForClass(ConstructionSite)
