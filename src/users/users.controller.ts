@@ -81,6 +81,16 @@ async assignWorkerToSite(
   const ownerId = req.user.sub;
   return this.usersService.assignWorkerToSite(workerId, siteId, ownerId);
 }
+
+// users.controller.ts
+
+@UseGuards(RolesGuard)
+@Get('manager/site-and-workers')
+@Roles(UserRole.CONSTRUCTION_MANAGER)
+async getManagerSiteAndWorkers(@Req() req) {
+  const managerId = req.user.sub;
+  return this.usersService.getSiteAndWorkersForManager(managerId);
+}
 }
 
 
