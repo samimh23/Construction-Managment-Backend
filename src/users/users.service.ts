@@ -30,7 +30,6 @@ async createConstructionOwner (CreateownerDto:any):Promise<User>{
       phone: CreateownerDto.phone,
       role: UserRole.OWNER, // Fixed role
       isActive: true,
-      // No createdBy - owners create themselves
     });
         return createdUser.save();
 
@@ -38,7 +37,6 @@ async createConstructionOwner (CreateownerDto:any):Promise<User>{
 }
 
 
-// users.service.ts
 
 async getSiteAndWorkersForManager(managerId: string) {
   const manager = await this.userModel.findById(managerId);
@@ -55,7 +53,6 @@ async getSiteAndWorkersForManager(managerId: string) {
 
   if (!site) throw new NotFoundException('Assigned site not found');
 
-  // Optionally exclude manager from workers array
   const workers = (site.workers as any[]).filter(w => w.role === UserRole.WORKER);
 
   return {
@@ -65,7 +62,6 @@ async getSiteAndWorkersForManager(managerId: string) {
 }
 
 async assignWorkerToSite(workerId: string, siteId: string, ownerId: string): Promise<User> {
-    // Find the worker and verify ownership
     const worker = await this.userModel.findOne({
       _id: workerId,
       createdBy: ownerId,
@@ -77,29 +73,24 @@ async assignWorkerToSite(workerId: string, siteId: string, ownerId: string): Pro
       throw new NotFoundException('Worker not found or not owned by you');
     }
 
-    // Find the site and verify ownership
     const site = await this.siteModel.findOne({ _id: siteId, owner: ownerId });
     if (!site) {
       throw new NotFoundException('Site not found or not owned by you');
     }
 
-    // If worker is already assigned to this site
     if (String(worker.assignedSite) === String(siteId)) {
       throw new ConflictException('Worker is already assigned to this site');
     }
 
-    // Optionally: Remove worker from previous site's workers array
     if (worker.assignedSite) {
       await this.siteModel.findByIdAndUpdate(worker.assignedSite, {
         $pull: { workers: worker._id }
       });
     }
 
-    // Assign worker to new site
 worker.assignedSite = new Types.ObjectId(siteId);
     await worker.save();
 
-    // Add worker to site's workers array
     await this.siteModel.findByIdAndUpdate(siteId, {
       $addToSet: { workers: worker._id }
     });
@@ -118,7 +109,6 @@ worker.assignedSite = new Types.ObjectId(siteId);
       throw new NotFoundException('Worker not found');
     }
 
-    // Check if email already exists
     const existingUser = await this.userModel.findOne({ email });
     if (existingUser) {
       throw new ConflictException('Email already exists');
@@ -136,13 +126,11 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
       throw new ConflictException('Site ID is required when creating a worker');
     }
 
-    // Verify the site exists and belongs to the owner
     const site = await this.siteModel.findOne({ _id: siteId, owner: ownerId });
     if (!site) {
       throw new NotFoundException('Site not found or you do not own this site');
     }
 
-    // Generate unique worker code
     const workerCode = await this.generateWorkerCode();
 
     const createdUser = new this.userModel({
@@ -155,7 +143,6 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
       assignedSite: siteId,
       workerCode: workerCode,
       isActive: true,
-      // No email or password for workers
     });
 
     const savedUser = await createdUser.save();
@@ -215,7 +202,6 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
       throw new ConflictException('This site already has a manager');
     }
 
-    // For promotion, we need to add email/password
     if (!worker.email) {
       throw new ConflictException('Worker needs email and password to be promoted to manager');
     }
@@ -224,7 +210,6 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
     worker.assignedSite = siteId as any;
     const updatedWorker = await worker.save();
 
-    // Update site
     await this.siteModel.findByIdAndUpdate(siteId, {
       manager: workerId,
       $pull: { workers: workerId }
@@ -292,7 +277,6 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
           
         }
 
-        // Add this method to your UsersService
 async updateRefreshToken(userId: string, refreshToken: string) {
   await this.userModel.findByIdAndUpdate(userId, { refreshToken });
 }

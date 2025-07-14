@@ -34,7 +34,6 @@ async registerowner(@Body() CreateOwnerDto: any){
     return this.usersService.addCredentialsToWorker(workerId, credentialsDto.email, credentialsDto.password, ownerId);
   }
 
-  // Promote worker to manager
   @UseGuards(RolesGuard)
   @Put('promote/:workerId/site/:siteId')
   @Roles(UserRole.OWNER)
@@ -43,12 +42,10 @@ async registerowner(@Body() CreateOwnerDto: any){
     return this.usersService.promoteToManager(workerId, siteId, ownerId);
   }
 
-  // Get workers for a site (for tablet display)
   @UseGuards(RolesGuard)
   @Get('site/:siteId/workers')
   @Roles(UserRole.CONSTRUCTION_MANAGER)
   async getSiteWorkers(@Param('siteId') siteId: string, @Req() req) {
-    // Verify manager has access to this site
     if (req.user.siteId !== siteId) {
       throw new ForbiddenException('You can only access workers from your assigned site');
     }
@@ -82,7 +79,6 @@ async assignWorkerToSite(
   return this.usersService.assignWorkerToSite(workerId, siteId, ownerId);
 }
 
-// users.controller.ts
 
 @UseGuards(RolesGuard)
 @Get('manager/site-and-workers')

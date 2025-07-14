@@ -46,8 +46,14 @@ password: string;
 
   @Prop()
   refreshToken: string;
-
   
+@Prop({ type: [Number], default: [] })
+  faceEmbedding: number[];
+
+  @Prop({ default: false })
+  faceRegistered: boolean;
+   @Prop({ type: Number, default: 0 }) // You can set a default value if you wish
+  dailyWage: number;
 
   
 }
