@@ -72,7 +72,7 @@ async assignWorkerToSite(workerId: string, siteId: string, ownerId: string): Pro
     if (!worker) {
       throw new NotFoundException('Worker not found or not owned by you');
     }
-
+    
     const site = await this.siteModel.findOne({ _id: siteId, owner: ownerId });
     if (!site) {
       throw new NotFoundException('Site not found or not owned by you');
