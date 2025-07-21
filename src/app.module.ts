@@ -12,6 +12,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConstructionSitesModule } from './construction_sites/construction_sites.module';
 import { AuthModule } from './auth/auth.module';
 import { AttendenceModule } from './attendence/attendence.module';
+import { LocationModule } from './Locator/location.module';
 
   @Module({
     imports: [ConfigModule.forRoot({
@@ -46,7 +47,7 @@ import { AttendenceModule } from './attendence/attendence.module';
       inject: [ConfigService],
     })
 
-      ,AuthModule, UsersModule,ConstructionSitesModule, AttendenceModule],
+      ,AuthModule, UsersModule,ConstructionSitesModule, AttendenceModule, LocationModule],
     controllers: [AppController],
     providers: [AppService],
   })
