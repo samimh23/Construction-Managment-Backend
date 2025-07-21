@@ -41,6 +41,12 @@ password: string;
   @Prop()
   workerCode: string
 
+    @Prop()
+  phone: string;       // <-- Change from 'phonenumber' to 'phone'
+
+  @Prop()
+  jobTitle: string; 
+
   @Prop({ default: true })
   isActive: boolean;
 
