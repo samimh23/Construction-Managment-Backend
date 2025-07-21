@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UserRole } from './schema/role.enum';
 import { RolesGuard } from 'src/config/guards/role.guard';
@@ -34,7 +34,6 @@ async registerowner(@Body() CreateOwnerDto: any){
     return this.usersService.addCredentialsToWorker(workerId, credentialsDto.email, credentialsDto.password, ownerId);
   }
 
-  // Promote worker to manager
   @UseGuards(RolesGuard)
   @Put('promote/:workerId/site/:siteId')
   @Roles(UserRole.OWNER)
@@ -43,12 +42,10 @@ async registerowner(@Body() CreateOwnerDto: any){
     return this.usersService.promoteToManager(workerId, siteId, ownerId);
   }
 
-  // Get workers for a site (for tablet display)
   @UseGuards(RolesGuard)
   @Get('site/:siteId/workers')
   @Roles(UserRole.CONSTRUCTION_MANAGER)
   async getSiteWorkers(@Param('siteId') siteId: string, @Req() req) {
-    // Verify manager has access to this site
     if (req.user.siteId !== siteId) {
       throw new ForbiddenException('You can only access workers from your assigned site');
     }
@@ -82,7 +79,6 @@ async assignWorkerToSite(
   return this.usersService.assignWorkerToSite(workerId, siteId, ownerId);
 }
 
-// users.controller.ts
 
 @UseGuards(RolesGuard)
 @Get('manager/site-and-workers')
@@ -91,6 +87,44 @@ async getManagerSiteAndWorkers(@Req() req) {
   const managerId = req.user.sub;
   return this.usersService.getSiteAndWorkersForManager(managerId);
 }
+
+@UseGuards(RolesGuard)
+@Put('edit-worker/:workerId')
+@Roles(UserRole.OWNER)
+async editWorker(@Param('workerId') workerId: string, @Body() updateDto: any, @Req() req) {
+  const ownerId = req.user.sub;
+  return await this.usersService.editWorker(workerId, updateDto, ownerId);
+}
+
+@UseGuards(RolesGuard)
+@Delete('delete-worker/:workerId')
+@Roles(UserRole.OWNER)
+async deleteWorker(@Param('workerId') workerId: string, @Req() req) {
+  const ownerId = req.user.sub;
+  return await this.usersService.deleteWorker(workerId, ownerId);
+}
+
+@UseGuards(RolesGuard)
+@Put('depromote-manager/:managerId')
+@Roles(UserRole.OWNER)
+async depromoteManagerToWorker(@Param('managerId') managerId: string, @Req() req) {
+  const ownerId = req.user.sub;
+  return await this.usersService.depromoteManagerToWorker(managerId, ownerId);
+}
+
+@UseGuards(RolesGuard)
+@Roles(UserRole.OWNER)
+  @Get('profile') 
+  async getProfile(@Req() req) {
+    const ownerId = req.user.sub;
+    return await this.usersService.getProfile(ownerId);
+  }
+
+  @UseGuards(RolesGuard)
+  @Put('profile')
+  async editProfile(@Req() req, @Body() updateDto: any) {
+    return await this.usersService.editProfile(req.user.sub, updateDto);
+  }
 }
 
 
