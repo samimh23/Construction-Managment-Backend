@@ -65,7 +65,7 @@ async assignWorkerToSite(workerId: string, siteId: string, ownerId: string): Pro
     const worker = await this.userModel.findOne({
       _id: workerId,
       createdBy: ownerId,
-      role: UserRole.WORKER,
+      role: { $in: [UserRole.WORKER, UserRole.CONSTRUCTION_MANAGER] },
       isActive: true,
     });
 
