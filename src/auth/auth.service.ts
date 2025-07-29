@@ -44,28 +44,32 @@ export class AuthService {
 
 
   async refreshToken(userId: string, refreshToken: string) {
-    // Make sure findById exists on UsersService
-    const user = await this.usersService.findById(userId);
-    if (!user || !user.refreshToken) throw new UnauthorizedException('Access Denied');
+  const user = await this.usersService.findById(userId);
+  if (!user || !user.refreshToken) throw new UnauthorizedException('Access Denied');
 
-    // Check if refresh token is valid and matches
-    if (user.refreshToken !== refreshToken) {
-      throw new UnauthorizedException('Invalid refresh token');
-    }
-
-    // Optionally, verify the refresh token using JWT
-    try {
-      this.jwtService.verify(refreshToken, { secret: process.env.JWT_REFRESH_SECRET });
-    } catch (e) {
-      throw new UnauthorizedException('Refresh token expired or invalid');
-    }
-
-    // Generate new access token
-    const payload = { email: user.email, sub: user._id, role: user.role };
-    const newAccessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
-
-    return {
-      access_token: newAccessToken,
-    };
+  if (user.refreshToken !== refreshToken) {
+    throw new UnauthorizedException('Invalid refresh token');
   }
+
+  try {
+    this.jwtService.verify(refreshToken, { secret: process.env.JWT_REFRESH_SECRET });
+  } catch (e) {
+    throw new UnauthorizedException('Refresh token expired or invalid');
+  }
+
+  const payload = { email: user.email, sub: user._id, role: user.role };
+  const newAccessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
+
+  // Generate a new refresh token
+  const refreshPayload = { sub: user._id };
+  const newRefreshToken = this.jwtService.sign(
+    refreshPayload,
+    { expiresIn: '7d', secret: process.env.JWT_REFRESH_SECRET }
+  );
+await this.usersService.updateRefreshToken(user._id as string, newRefreshToken);
+  return {
+    access_token: newAccessToken,
+    refresh_token: newRefreshToken,
+  };
 }
+} 
