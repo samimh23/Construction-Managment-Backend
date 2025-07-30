@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConstructionSitesService } from './construction_sites.service';
 import { ConstructionSitesController } from './construction_sites.controller';
-import { ConstructionSite, ConstructionSiteSchema } from './Schemas/construction_site.schema';
+import { ConstructionSite, ConstructionSiteSchema } from './schemas/construction_site.schema';
 
 @Module({
   imports: [
