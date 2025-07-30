@@ -4,7 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { promises } from 'dns';
 import { UserRole } from './schema/role.enum';
-import { ConstructionSite } from 'src/construction_sites/schemas/construction_site.schema';
+import { ConstructionSite } from 'src/construction_sites/Schemas/Construction_Site.schema';
 import * as bcrypt from 'bcrypt';
 
 
