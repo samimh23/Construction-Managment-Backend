@@ -4,6 +4,7 @@ import { UserRole } from './schema/role.enum';
 import { RolesGuard } from 'src/config/guards/role.guard';
 import { Roles } from 'src/config/decorators/role.decorators';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { User } from './schema/user.schema';
 @ApiTags('users')
 @ApiBearerAuth()
 @Controller('users')
@@ -88,6 +89,11 @@ async getManagerSiteAndWorkers(@Req() req) {
   return this.usersService.getSiteAndWorkersForManager(managerId);
 }
 
+ @Get(':id')
+  async findById(@Param('id') id: string): Promise<User | null> {
+    return this.usersService.findById(id);
+
+
 @UseGuards(RolesGuard)
 @Put('edit-worker/:workerId')
 @Roles(UserRole.OWNER)
@@ -124,6 +130,7 @@ async depromoteManagerToWorker(@Param('managerId') managerId: string, @Req() req
   @Put('profile')
   async editProfile(@Req() req, @Body() updateDto: any) {
     return await this.usersService.editProfile(req.user.sub, updateDto);
+
   }
 }
 
