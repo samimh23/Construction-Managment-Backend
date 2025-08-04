@@ -15,6 +15,7 @@ interface ManagerLocation {
   longitude: number;
   timestamp: string;
   siteId?: string;
+  ownerId: string; // <-- Added ownerId for filtering
 }
 
 @WebSocketGateway({ cors: true })
@@ -28,15 +29,27 @@ export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect
   // Map socket.id => managerId (for disconnect tracking)
   private socketManagerMap: Map<string, string> = new Map();
 
+  // Map ownerId => Set of managerIds
+  private ownerManagersMap: Map<string, Set<string>> = new Map();
+
   handleConnection(client: Socket) {
     console.log(`[SOCKET] Client connected: ${client.id}`);
   }
 
-  // Handle socket disconnect
   handleDisconnect(client: Socket) {
     const managerId = this.socketManagerMap.get(client.id);
     if (managerId) {
-      console.log(`[SOCKET] Manager disconnected: ${managerId} (Socket: ${client.id})`);
+      const location = this.connectedManagers.get(managerId);
+      if (location && location.ownerId) {
+        // Remove from ownerManagersMap
+        const ownerSet = this.ownerManagersMap.get(location.ownerId);
+        if (ownerSet) {
+          ownerSet.delete(managerId);
+          if (ownerSet.size === 0) {
+            this.ownerManagersMap.delete(location.ownerId);
+          }
+        }
+      }
       this.connectedManagers.delete(managerId);
       this.socketManagerMap.delete(client.id);
       this.broadcastConnectedManagers();
@@ -50,14 +63,22 @@ export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect
     @MessageBody() data: ManagerLocation,
     @ConnectedSocket() client: Socket,
   ) {
-    // Track this manager as connected
-    if (data.managerId) {
+    if (data.managerId && data.ownerId) {
       console.log(`[SOCKET] Manager location received:`, data);
       this.connectedManagers.set(data.managerId, data);
       this.socketManagerMap.set(client.id, data.managerId);
+
+      // Maintain ownerManagersMap
+      let ownerSet = this.ownerManagersMap.get(data.ownerId);
+      if (!ownerSet) {
+        ownerSet = new Set<string>();
+        this.ownerManagersMap.set(data.ownerId, ownerSet);
+      }
+      ownerSet.add(data.managerId);
+
       this.broadcastConnectedManagers();
     } else {
-      console.log(`[SOCKET] Bad location: No managerId`, data);
+      console.log(`[SOCKET] Bad location: No managerId or ownerId`, data);
     }
 
     // Broadcast location update to all clients
@@ -67,6 +88,7 @@ export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect
       longitude: data.longitude,
       timestamp: data.timestamp,
       siteId: data.siteId,
+      ownerId: data.ownerId,
     });
   }
 
@@ -77,7 +99,21 @@ export class LocationGateway implements OnGatewayConnection, OnGatewayDisconnect
     this.server.emit('connectedManagers', managers);
   }
 
-  // Optionally: add a method to get all connected managers for REST or other internal use
+  @SubscribeMessage('getMyManagersLocations')
+  handleGetMyManagersLocations(
+    @MessageBody() ownerId: string,
+    @ConnectedSocket() client: Socket
+  ) {
+    const managerIds = this.ownerManagersMap.get(ownerId);
+    let result: ManagerLocation[] = [];
+    if (managerIds) {
+      result = Array.from(managerIds)
+        .map((managerId) => this.connectedManagers.get(managerId))
+        .filter((ml): ml is ManagerLocation => !!ml);
+    }
+    client.emit('myManagersLocations', result);
+  }
+
   getAllConnectedManagers(): ManagerLocation[] {
     return Array.from(this.connectedManagers.values());
   }

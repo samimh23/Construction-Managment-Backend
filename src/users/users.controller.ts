@@ -4,6 +4,7 @@ import { UserRole } from './schema/role.enum';
 import { RolesGuard } from 'src/config/guards/role.guard';
 import { Roles } from 'src/config/decorators/role.decorators';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { User } from './schema/user.schema';
 @ApiTags('users')
 @ApiBearerAuth()
 @Controller('users')
@@ -87,6 +88,10 @@ async getManagerSiteAndWorkers(@Req() req) {
   const managerId = req.user.sub;
   return this.usersService.getSiteAndWorkersForManager(managerId);
 }
+ @Get(':id')
+  async findById(@Param('id') id: string): Promise<User | null> {
+    return this.usersService.findById(id);
+  }
 }
 
 

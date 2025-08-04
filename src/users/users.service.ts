@@ -113,7 +113,6 @@ worker.assignedSite = new Types.ObjectId(siteId);
     if (existingUser) {
       throw new ConflictException('Email already exists');
     }
-
     const hashedPassword = await bcrypt.hash(password, 10);
     worker.email = email;
     worker.password = hashedPassword;
@@ -288,5 +287,6 @@ async findByEmail(email: string): Promise<User | null> {
 async findById(id: string): Promise<User | null> {
   return this.userModel.findById(id).exec();
 }
-  }
+
+}
 
