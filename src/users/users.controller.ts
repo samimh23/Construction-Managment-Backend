@@ -1,4 +1,4 @@
-import { Body, Controller, ForbiddenException, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, ForbiddenException, Get, Param, Post, Put, Query, Req, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { UserRole } from './schema/role.enum';
 import { RolesGuard } from 'src/config/guards/role.guard';
@@ -88,9 +88,49 @@ async getManagerSiteAndWorkers(@Req() req) {
   const managerId = req.user.sub;
   return this.usersService.getSiteAndWorkersForManager(managerId);
 }
+
  @Get(':id')
   async findById(@Param('id') id: string): Promise<User | null> {
     return this.usersService.findById(id);
+
+
+@UseGuards(RolesGuard)
+@Put('edit-worker/:workerId')
+@Roles(UserRole.OWNER)
+async editWorker(@Param('workerId') workerId: string, @Body() updateDto: any, @Req() req) {
+  const ownerId = req.user.sub;
+  return await this.usersService.editWorker(workerId, updateDto, ownerId);
+}
+
+@UseGuards(RolesGuard)
+@Delete('delete-worker/:workerId')
+@Roles(UserRole.OWNER)
+async deleteWorker(@Param('workerId') workerId: string, @Req() req) {
+  const ownerId = req.user.sub;
+  return await this.usersService.deleteWorker(workerId, ownerId);
+}
+
+@UseGuards(RolesGuard)
+@Put('depromote-manager/:managerId')
+@Roles(UserRole.OWNER)
+async depromoteManagerToWorker(@Param('managerId') managerId: string, @Req() req) {
+  const ownerId = req.user.sub;
+  return await this.usersService.depromoteManagerToWorker(managerId, ownerId);
+}
+
+@UseGuards(RolesGuard)
+@Roles(UserRole.OWNER)
+  @Get('profile') 
+  async getProfile(@Req() req) {
+    const ownerId = req.user.sub;
+    return await this.usersService.getProfile(ownerId);
+  }
+
+  @UseGuards(RolesGuard)
+  @Put('profile')
+  async editProfile(@Req() req, @Body() updateDto: any) {
+    return await this.usersService.editProfile(req.user.sub, updateDto);
+
   }
 }
 

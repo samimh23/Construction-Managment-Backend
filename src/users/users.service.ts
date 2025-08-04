@@ -65,7 +65,7 @@ async assignWorkerToSite(workerId: string, siteId: string, ownerId: string): Pro
     const worker = await this.userModel.findOne({
       _id: workerId,
       createdBy: ownerId,
-      role: UserRole.WORKER,
+      role: { $in: [UserRole.WORKER, UserRole.CONSTRUCTION_MANAGER] },
       isActive: true,
     });
 
@@ -129,6 +129,8 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
     if (!site) {
       throw new NotFoundException('Site not found or you do not own this site');
     }
+      const dailyWage = Number(createWorkerDto.dailyWageTND ?? createWorkerDto.dailyWage ?? 0);
+
 
     const workerCode = await this.generateWorkerCode();
 
@@ -142,6 +144,7 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
       assignedSite: siteId,
       workerCode: workerCode,
       isActive: true,
+      dailyWage,
     });
 
     const savedUser = await createdUser.save();
@@ -217,6 +220,44 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
     return updatedWorker;
   }
 
+  async depromoteManagerToWorker(managerId: string, ownerId: string): Promise<User> {
+    // Find the manager (must be owned by this owner)
+    const manager = await this.userModel.findOne({
+      _id: managerId,
+      createdBy: ownerId,
+      role: UserRole.CONSTRUCTION_MANAGER,
+      isActive: true,
+    });
+
+    if (!manager) {
+      throw new NotFoundException('Manager not found or not owned by you');
+    }
+
+    // Find the site this manager is assigned to
+    const site = await this.siteModel.findOne({
+      _id: manager.assignedSite,
+      owner: ownerId,
+      manager: managerId,
+    });
+
+    if (!site) {
+      throw new NotFoundException('Site not found or does not have this manager');
+    }
+
+    // Change manager's role to WORKER
+    manager.role = UserRole.WORKER;
+    await manager.save();
+
+    // Remove manager from site.manager field,
+    // and (optionally) add back to site's workers array
+    await this.siteModel.findByIdAndUpdate(site._id, {
+      $set: { manager: null },
+      $addToSet: { workers: manager._id },
+    });
+
+    return manager;
+  }
+
 
  
 
@@ -288,5 +329,81 @@ async findById(id: string): Promise<User | null> {
   return this.userModel.findById(id).exec();
 }
 
+
 }
+
+ async deleteWorker(workerId: string, ownerId: string): Promise<{ deleted: boolean }> {
+    // Find worker, ensure it's owned by this owner
+    const worker = await this.userModel.findOne({
+      _id: workerId,
+      createdBy: ownerId,
+      role: { $in: [UserRole.WORKER, UserRole.CONSTRUCTION_MANAGER] },
+    });
+
+    if (!worker) {
+      throw new NotFoundException('Worker not found or not owned by you');
+    }
+
+    // Remove worker from assigned site if present
+    if (worker.assignedSite) {
+      await this.siteModel.findByIdAndUpdate(worker.assignedSite, {
+        $pull: { workers: worker._id }
+      });
+    }
+
+    // Delete worker
+    await this.userModel.deleteOne({ _id: workerId });
+
+    return { deleted: true };
+  }
+
+   async editWorker(workerId: string, updateDto: any, ownerId: string): Promise<User> {
+    // Only allow editing workers created by this owner
+    const worker = await this.userModel.findOne({
+      _id: workerId,
+      createdBy: ownerId,
+      role: { $in: [UserRole.WORKER, UserRole.CONSTRUCTION_MANAGER] }
+    });
+
+    if (!worker) {
+      throw new NotFoundException('Worker not found or not owned by you');
+    }
+
+    // Update allowed fields
+    if (updateDto.firstName !== undefined) worker.firstName = updateDto.firstName;
+    if (updateDto.lastName !== undefined) worker.lastName = updateDto.lastName;
+    if (updateDto.phone !== undefined) worker.phone = updateDto.phone;
+    if (updateDto.jobTitle !== undefined) worker.jobTitle = updateDto.jobTitle;
+    if (updateDto.dailyWageTND !== undefined) worker.dailyWage = Number(updateDto.dailyWageTND);
+    if (updateDto.dailyWage !== undefined) worker.dailyWage = Number(updateDto.dailyWage);
+    if (updateDto.isActive !== undefined) worker.isActive = updateDto.isActive;
+
+    // You can add other fields as needed
+
+    await worker.save();
+    return worker;
+  }
+
+  async getProfile(userId: string): Promise<User> {
+    const user = await this.userModel.findById(userId).select('-password').exec();
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+   async editProfile(userId: string, updateDto: any): Promise<User> {
+    const user = await this.userModel.findById(userId).exec();
+    if (!user) throw new NotFoundException('User not found');
+
+    if (updateDto.firstName !== undefined) user.firstName = updateDto.firstName;
+    if (updateDto.lastName !== undefined) user.lastName = updateDto.lastName;
+    if (updateDto.phone !== undefined) user.phone = updateDto.phone;
+    // add other fields as needed
+    await user.save();
+
+    // Return profile without password
+    return await this.userModel.findById(userId).select('-password').exec();
+  }
+
+
+  }
 
