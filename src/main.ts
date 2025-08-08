@@ -3,6 +3,9 @@ import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
+  // Print memory usage at boot for diagnostics
+  console.log('Memory usage at boot:', process.memoryUsage());
+
   const app = await NestFactory.create(AppModule);
 
   // Swagger config
@@ -18,10 +21,14 @@ async function bootstrap() {
 
   // Enable CORS BEFORE listening!
   app.enableCors({
-    origin: true, // or specify the origin(s) you want to allow
-    credentials: true, // if you use cookies/sessions
+    origin: true,
+    credentials: true,
   });
 
-  await app.listen(3000);
+  // Use dynamic port for cloud deployment, default to 3000
+  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  await app.listen(port);
+  console.log(`Server started on port ${port}`);
 }
+
 bootstrap();

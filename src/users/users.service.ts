@@ -1,22 +1,24 @@
 import { ConflictException, Injectable, NotFoundException, UnauthorizedException } from '@nestjs/common';
 import { User,  } from './schema/user.schema';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import mongoose, { Model, Types } from 'mongoose';
 import { promises } from 'dns';
 import { UserRole } from './schema/role.enum';
 import { ConstructionSite } from 'src/construction_sites/Schemas/Construction_Site.schema';
 import * as bcrypt from 'bcrypt';
-
+import * as crypto from 'crypto';
+import { EmailService } from 'src/config/email.service';
 
 @Injectable()
 export class UsersService {
       constructor(@InjectModel(User.name) private userModel: Model<User>,
+      private readonly emailService: EmailService,
 
       @InjectModel(ConstructionSite.name) private siteModel :Model<ConstructionSite>
     
     ) {}
 
-async createConstructionOwner (CreateownerDto:any):Promise<User>{
+/*async createConstructionOwner (CreateownerDto:any):Promise<User>{
   const userexists= await this.userModel.findOne({email:CreateownerDto.email})
   if(userexists){
       throw new ConflictException('User with this email already exists');
@@ -28,15 +30,17 @@ async createConstructionOwner (CreateownerDto:any):Promise<User>{
       email: CreateownerDto.email,
       password: hashedpassword,
       phone: CreateownerDto.phone,
+      company: CreateownerDto.company,
       role: UserRole.OWNER, // Fixed role
       isActive: true,
     });
         return createdUser.save();
+}*/
 
-
+async createUser(userData: any): Promise<User> {
+  const createdUser = new this.userModel(userData);
+  return createdUser.save();
 }
-
-
 
 async getSiteAndWorkersForManager(managerId: string) {
   const manager = await this.userModel.findById(managerId);
@@ -125,12 +129,15 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
       throw new ConflictException('Site ID is required when creating a worker');
     }
 
-    const site = await this.siteModel.findOne({ _id: siteId, owner: ownerId });
+    // Convert siteId to ObjectId if it's a string
+    const siteObjectId = new mongoose.Types.ObjectId(siteId);
+
+    const site = await this.siteModel.findOne({ _id: siteObjectId, owner: ownerId });
     if (!site) {
       throw new NotFoundException('Site not found or you do not own this site');
     }
-      const dailyWage = Number(createWorkerDto.dailyWageTND ?? createWorkerDto.dailyWage ?? 0);
-
+      
+    const dailyWage = Number(createWorkerDto.dailyWageTND ?? createWorkerDto.dailyWage ?? 0);
 
     const workerCode = await this.generateWorkerCode();
 
@@ -141,7 +148,7 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
       jobTitle: createWorkerDto.jobTitle,
       role: UserRole.WORKER,
       createdBy: ownerId,
-      assignedSite: siteId,
+      assignedSite: siteObjectId, // Use ObjectId here
       workerCode: workerCode,
       isActive: true,
       dailyWage,
@@ -150,12 +157,12 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
     const savedUser = await createdUser.save();
 
     // Add worker to site's workers array
-    await this.siteModel.findByIdAndUpdate(siteId, {
+    await this.siteModel.findByIdAndUpdate(siteObjectId, { // Use ObjectId here too
       $addToSet: { workers: savedUser._id }
     });
 
     return savedUser;
-  }
+}
 
     async getallworkerbyowner(ownerId:string){
       const workers= await this.userModel.find({
@@ -180,9 +187,6 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
     return `WRK${nextNumber.toString().padStart(3, '0')}`;
   }
 
- 
- 
- 
       async promoteToManager(workerId: string, siteId: string, ownerId: string): Promise<User> {
     const worker = await this.userModel.findOne({
       _id: workerId,
@@ -258,9 +262,6 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
     return manager;
   }
 
-
- 
-
  async getManagersWithSites(ownerId:string):Promise<any[]>{
     const managers= await this.userModel.find({
         createdBy:ownerId,
@@ -296,9 +297,7 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
       })
     );
         return managerswithsite;
-
  }
- 
  
       async getWorkersByOwner(ownerId:string):Promise<User[]>{
         return this.userModel.find({
@@ -306,7 +305,6 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
             role: { $in: [UserRole.WORKER, UserRole.CONSTRUCTION_MANAGER] },
                 isActive: true,
              }).exec();
-
         }
 
         async findWorkersBySite (siteId:string):Promise<User[]> {
@@ -314,7 +312,6 @@ async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promi
             assignedSite:siteId,
         role:{$in:[UserRole.WORKER,UserRole.CONSTRUCTION_MANAGER]},
         isActive:true}).exec();
-          
         }
 
 async updateRefreshToken(userId: string, refreshToken: string) {
@@ -327,9 +324,6 @@ async findByEmail(email: string): Promise<User | null> {
 
 async findById(id: string): Promise<User | null> {
   return this.userModel.findById(id).exec();
-}
-
-
 }
 
  async deleteWorker(workerId: string, ownerId: string): Promise<{ deleted: boolean }> {
@@ -404,6 +398,125 @@ async findById(id: string): Promise<User | null> {
     return await this.userModel.findById(userId).select('-password').exec();
   }
 
+  // Forget Password Functionality
+  
+  /**
+   * Generate password reset token for a user
+   * @param email - User's email address
+   * @returns Object containing success message and reset token (for testing/development)
+   */
+  async forgotPassword(email: string): Promise<{ message: string }> {
+  const user = await this.userModel.findOne({ email, isActive: true }).exec();
 
+  if (!user) {
+    return { message: 'If an account with that email exists, a password reset code has been sent.' };
   }
 
+  // Generate a 6-digit code
+  const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+  const resetCodeExpiry = new Date(Date.now() + 15 * 60 * 1000); // 15 min
+
+  // Hash the code before storing
+  const hashedCode = crypto.createHash('sha256').update(resetCode).digest('hex');
+
+  await this.userModel.findByIdAndUpdate(user._id, {
+    passwordResetToken: hashedCode,
+    passwordResetExpiry: resetCodeExpiry,
+  });
+
+  // Send email with code
+  await this.emailService.sendMail(
+    email,
+    'Password Reset Code',
+    `<p>Your password reset code is: <b>${resetCode}</b></p>
+     <p>It will expire in 15 minutes.</p>`
+  );
+
+  return { message: 'If an account with that email exists, a password reset code has been sent.' };
+}
+
+  /**
+   * Reset user password using reset token
+   * @param resetToken - Token from email link
+   * @param newPassword - New password to set
+   * @returns Success message
+   */
+  async resetPassword(resetToken: string, newPassword: string): Promise<{ message: string }> {
+    if (!resetToken || !newPassword) {
+      throw new ConflictException('Reset token and new password are required');
+    }
+
+    // Hash the provided token to compare with stored hash
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    // Find user with valid reset token
+    const user = await this.userModel.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpiry: { $gt: new Date() }, // Token not expired
+      isActive: true,
+    }).exec();
+
+    if (!user) {
+      throw new UnauthorizedException('Invalid or expired reset token');
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    // Update user password and clear reset token fields
+    await this.userModel.findByIdAndUpdate(user._id, {
+      password: hashedPassword,
+      passwordResetToken: undefined,
+      passwordResetExpiry: undefined,
+    });
+
+    return { message: 'Password has been reset successfully' };
+  }
+
+  /**
+   * Verify if a reset token is valid (optional - for frontend validation)
+   * @param resetToken - Token to verify
+   * @returns Boolean indicating validity
+   */
+
+  async resetPasswordWithCode(email: string, code: string, newPassword: string): Promise<{ message: string }> {
+  const user = await this.userModel.findOne({ email, isActive: true }).exec();
+  if (!user) throw new NotFoundException('Invalid email or code');
+
+  const hashedCode = crypto.createHash('sha256').update(code).digest('hex');
+
+  if (
+    !user.passwordResetToken ||
+    user.passwordResetToken !== hashedCode ||
+    !user.passwordResetExpiry ||
+    user.passwordResetExpiry < new Date()
+  ) {
+    throw new UnauthorizedException('Invalid or expired reset code');
+  }
+
+  const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+  await this.userModel.findByIdAndUpdate(user._id, {
+    password: hashedPassword,
+    passwordResetToken: undefined,
+    passwordResetExpiry: undefined,
+  });
+
+  return { message: 'Password has been reset successfully' };
+}
+  async verifyResetToken(resetToken: string): Promise<{ valid: boolean }> {
+    if (!resetToken) {
+      return { valid: false };
+    }
+
+    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+
+    const user = await this.userModel.findOne({
+      passwordResetToken: hashedToken,
+      passwordResetExpiry: { $gt: new Date() },
+      isActive: true,
+    }).exec();
+
+    return { valid: !!user };
+  }
+}

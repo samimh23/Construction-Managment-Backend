@@ -14,6 +14,10 @@ export class AuthController {
     }
     return this.authService.login(user);
   }
+   @Post('register-owner')
+  async registerOwner(@Body() createOwnerDto: any) {
+    return this.authService.registerOwner(createOwnerDto);
+  }
 
   @Post('refresh')
 async refresh(@Body() body: { userId: string; refreshToken: string }) {
