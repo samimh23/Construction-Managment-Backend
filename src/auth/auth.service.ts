@@ -1,8 +1,9 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../users/users.service';
 import * as bcrypt from 'bcrypt';
 import { CodesService } from 'src/codes/codes.service';
+import { UserRole } from 'src/users/schema/role.enum';
 
 @Injectable()
 export class AuthService {
@@ -72,4 +73,35 @@ await this.usersService.updateRefreshToken(user._id as string, newRefreshToken);
     refresh_token: newRefreshToken,
   };
 }
+
+async registerOwner(createOwnerDto: any) {
+    // Check if user already exists
+    const userExists = await this.usersService.findByEmail(createOwnerDto.email);
+    if (userExists) {
+      throw new ConflictException('User with this email already exists');
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(createOwnerDto.password, 10);
+    
+    // Create user object (you'll need to inject User model or call UsersService)
+    const userData = {
+      firstName: createOwnerDto.firstName,
+      lastName: createOwnerDto.lastName,
+      email: createOwnerDto.email,
+      password: hashedPassword,
+      phone: createOwnerDto.phone,
+      company: createOwnerDto.company,
+      role: UserRole.OWNER, // or UserRole.OWNER
+      isActive: true,
+    };
+
+    // Create the user
+    const user = await this.usersService.createUser(userData); // You'll need this method
+    
+    // Generate tokens and return login response
+    return this.login(user);
+  }
+
+
 } 

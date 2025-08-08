@@ -4,9 +4,10 @@ import { UsersController } from './users.controller';
 import { MongooseModule } from '@nestjs/mongoose';
 import { User, UserSchema } from './schema/user.schema';
 import { ConstructionSite, ConstructionSiteSchema } from 'src/construction_sites/Schemas/Construction_Site.schema';
+import { EmailModule } from 'src/config/email.module';
 
 @Module({
-  imports: [
+  imports: [EmailModule,
     MongooseModule.forFeature([{ name: User.name, schema: UserSchema }
       ,{
         name: ConstructionSite.name,

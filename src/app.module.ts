@@ -13,9 +13,10 @@ import { ConstructionSitesModule } from './construction_sites/construction_sites
 import { AuthModule } from './auth/auth.module';
 import { AttendenceModule } from './attendence/attendence.module';
 import { LocationModule } from './Locator/location.module';
+import { EmailModule } from './config/email.module';
 
   @Module({
-    imports: [ConfigModule.forRoot({
+    imports: [EmailModule, ConfigModule.forRoot({
       isGlobal:true,
       cache:true,
       load:[config]
@@ -49,7 +50,7 @@ import { LocationModule } from './Locator/location.module';
 
       ,AuthModule, UsersModule,ConstructionSitesModule, AttendenceModule, LocationModule],
     controllers: [AppController],
-    providers: [AppService],
+    providers: [AppService,],
   })
   export class AppModule {}
 

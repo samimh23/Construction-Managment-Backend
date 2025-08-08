@@ -3,7 +3,6 @@ import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { UserRole } from './role.enum';
 
 @Schema({timestamps: true })
-
 export class User extends Document  {
   @Prop({ required: true })
   firstName: string;
@@ -12,22 +11,21 @@ export class User extends Document  {
   lastName: string;
 
   @Prop({
-  required: function(this: any) {
-    return this.role !== UserRole.WORKER;
-  },
-  
-})
-email: string;
+    required: function(this: any) {
+      return this.role !== UserRole.WORKER;
+    },
+  })
+  email: string;
 
-@Prop({
-  required: function(this: any) {
-    return this.role !== UserRole.WORKER;
-  },
-})
-password: string;
+  @Prop({
+    required: function(this: any) {
+      return this.role !== UserRole.WORKER;
+    },
+  })
+  password: string;
 
   @Prop()
-  phonenumber:string;
+  phonenumber: string;
 
   @Prop({ required: true, enum: UserRole, default: UserRole.WORKER })
   role: string;
@@ -39,30 +37,38 @@ password: string;
   assignedSite: Types.ObjectId;
 
   @Prop()
-  workerCode: string
-
-    @Prop()
-  phone: string;       // <-- Change from 'phonenumber' to 'phone'
+  workerCode: string;
 
   @Prop()
-  jobTitle: string; 
+  phone: string;
+
+  @Prop()
+  jobTitle: string;
 
   @Prop({ default: true })
   isActive: boolean;
 
   @Prop()
   refreshToken: string;
-  
-@Prop({ type: [Number], default: [] })
+
+  @Prop({ type: [Number], default: [] })
   faceEmbedding: number[];
 
   @Prop({ default: false })
   faceRegistered: boolean;
-   @Prop({ type: Number, default: 0 }) // You can set a default value if you wish
+
+  @Prop({ type: Number, default: 0 })
   dailyWage: number;
 
-  
-}
+  @Prop()
+  passwordResetToken?: string;
 
+  @Prop()
+  passwordResetExpiry?: Date;
+
+  // Add company name here
+  @Prop()
+  company: string;
+}
 
 export const UserSchema = SchemaFactory.createForClass(User);
