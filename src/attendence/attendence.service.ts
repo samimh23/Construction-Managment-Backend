@@ -9,7 +9,7 @@ import axios from 'axios';
 import * as FormData from 'form-data';
 
 // Use environment variable or fallback to localhost
-const FASTAPI_URL = process.env.FASTAPI_URL || 'http://localhost:8002';
+const FASTAPI_URL = process.env.FASTAPI_URL ;
 
 @Injectable()
 export class AttendanceService {
@@ -107,8 +107,13 @@ export class AttendanceService {
   }
 
 async checkInWithFace(photoBuffer: Buffer, siteId: string) {
+  const FASTAPI_URL = process.env.FASTAPI_URL;
+  console.log('FASTAPI_URL:', FASTAPI_URL);
+  const url = `${FASTAPI_URL}/recognize/`;
+  console.log('Posting to:', url);
     const form = new FormData();
     form.append('file', photoBuffer, { filename: 'face.jpg' });
+    
 
     try {
       const response = await axios.post(`${FASTAPI_URL}/recognize/`, form, {
@@ -136,12 +141,17 @@ async checkInWithFace(photoBuffer: Buffer, siteId: string) {
         site: siteId
       });
     } catch (error) {
-      throw new InternalServerErrorException('Failed to connect to FastAPI (face check-in).');
-    }
+  console.error('AXIOS ERROR:', error?.response?.data || error.message || error);
+  throw new InternalServerErrorException('Failed to connect to FastAPI (face check-in): ' + (error?.response?.data?.detail || error.message));
+}
   }
 
   /** Only photo needed for check-out */
   async checkOutWithFace(photoBuffer: Buffer) {
+     const FASTAPI_URL = process.env.FASTAPI_URL;
+  console.log('FASTAPI_URL:', FASTAPI_URL);
+  const url = `${FASTAPI_URL}/recognize/`;
+  console.log('Posting to:', url);
     const form = new FormData();
     form.append('file', photoBuffer, { filename: 'face.jpg' });
 
@@ -217,5 +227,19 @@ async checkInWithFace(photoBuffer: Buffer, siteId: string) {
       dailyWage: worker.dailyWage,
       salary: +salary.toFixed(2)
     };
+  }
+
+   async testFastApiConnectivity() {
+    try {
+      const resp = await axios.get(`${FASTAPI_URL}`);
+      console.log('FastAPI connectivity OK:', resp.status, resp.data);
+      return { status: resp.status, data: resp.data };
+    } catch (err) {
+      console.error('FastAPI connectivity FAILED:', err.message);
+      if (err.response) {
+        console.error('Response:', err.response.status, err.response.data);
+      }
+      throw new InternalServerErrorException('Failed to connect to FastAPI.');
+    }
   }
 }

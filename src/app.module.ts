@@ -1,13 +1,11 @@
 
   import { Module  } from '@nestjs/common';
   import { AppController } from './app.controller';
-  import { AppService } from './app.service';
-
-
-  import { UsersModule } from './users/users.module';
-  import { ConfigModule, ConfigService } from '@nestjs/config';
-  import config from './config/config';
-  import { MongooseModule } from '@nestjs/mongoose';
+import { AppService } from './app.service';
+import { UsersModule } from './users/users.module';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import config from './config/config';
+import { MongooseModule } from '@nestjs/mongoose';
 import { JwtModule } from '@nestjs/jwt';
 import { ConstructionSitesModule } from './construction_sites/construction_sites.module';
 import { AuthModule } from './auth/auth.module';
