@@ -123,46 +123,66 @@ worker.assignedSite = new Types.ObjectId(siteId);
 
     return worker.save();
   }
+async createWorker(createWorkerDto: any, ownerId: string, siteId?: string): Promise<User> {
+  console.log('[createWorker] Starting worker creation process...');
+  console.log('[createWorker] Input DTO:', createWorkerDto);
+  console.log('[createWorker] ownerId:', ownerId);
+  console.log('[createWorker] siteId:', siteId);
 
-async createWorker(createWorkerDto: any, ownerId: string, siteId: string): Promise<User> {
-    if (!siteId) {
-      throw new ConflictException('Site ID is required when creating a worker');
-    }
+  let siteObjectId = null;
+  let site = null;
 
-    // Convert siteId to ObjectId if it's a string
-    const siteObjectId = new mongoose.Types.ObjectId(siteId);
+  // Only handle site if siteId is provided
+  if (siteId) {
+    siteObjectId = new mongoose.Types.ObjectId(siteId);
+    console.log('[createWorker] Converted siteId to ObjectId:', siteObjectId);
 
-    const site = await this.siteModel.findOne({ _id: siteObjectId, owner: ownerId });
+    site = await this.siteModel.findOne({ _id: siteObjectId, owner: ownerId });
+    console.log('[createWorker] Site lookup result:', site);
+
     if (!site) {
+      console.error('[createWorker] Site not found or unauthorized access.');
       throw new NotFoundException('Site not found or you do not own this site');
     }
-      
-    const dailyWage = Number(createWorkerDto.dailyWageTND ?? createWorkerDto.dailyWage ?? 0);
+  }
 
-    const workerCode = await this.generateWorkerCode();
+  const dailyWage = Number(createWorkerDto.dailyWageTND ?? createWorkerDto.dailyWage ?? 0);
+  console.log('[createWorker] Calculated dailyWage:', dailyWage);
 
-    const createdUser = new this.userModel({
-      firstName: createWorkerDto.firstName,
-      lastName: createWorkerDto.lastName,
-      phone: createWorkerDto.phone,
-      jobTitle: createWorkerDto.jobTitle,
-      role: UserRole.WORKER,
-      createdBy: ownerId,
-      assignedSite: siteObjectId, // Use ObjectId here
-      workerCode: workerCode,
-      isActive: true,
-      dailyWage,
-    });
+  const workerCode = await this.generateWorkerCode();
+  console.log('[createWorker] Generated workerCode:', workerCode);
 
-    const savedUser = await createdUser.save();
+  const createdUser = new this.userModel({
+    firstName: createWorkerDto.firstName,
+    lastName: createWorkerDto.lastName,
+    phone: createWorkerDto.phone,
+    jobTitle: createWorkerDto.jobTitle,
+    role: UserRole.WORKER,
+    createdBy: ownerId,
+    assignedSite: siteObjectId ?? undefined, // Only set if exists
+    workerCode: workerCode,
+    isActive: true,
+    dailyWage,
+  });
 
-    // Add worker to site's workers array
-    await this.siteModel.findByIdAndUpdate(siteObjectId, { // Use ObjectId here too
-      $addToSet: { workers: savedUser._id }
-    });
+  console.log('[createWorker] Created User object (before save):', createdUser);
 
-    return savedUser;
+  const savedUser = await createdUser.save();
+  console.log('[createWorker] Saved User to DB:', savedUser);
+
+  // Only add worker to site's workers array if siteId is provided
+  if (siteObjectId) {
+    await this.siteModel.findByIdAndUpdate(
+      siteObjectId,
+      { $addToSet: { workers: savedUser._id } }
+    );
+    console.log(`[createWorker] Worker ${savedUser._id} added to site ${siteObjectId}`);
+  }
+
+  console.log('[createWorker] Worker creation process completed successfully.');
+  return savedUser;
 }
+
 
     async getallworkerbyowner(ownerId:string){
       const workers= await this.userModel.find({

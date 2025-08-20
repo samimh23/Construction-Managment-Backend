@@ -7,6 +7,7 @@ import { User } from 'src/users/schema/user.schema';
 import { WorkSession } from './schema/work_session.schema';
 import axios from 'axios';
 import * as FormData from 'form-data';
+import { ConstructionSite } from 'src/construction_sites/Schemas/Construction_Site.schema';
 
 // Use environment variable or fallback to localhost
 const FASTAPI_URL = process.env.FASTAPI_URL ;
@@ -16,6 +17,8 @@ export class AttendanceService {
   constructor(
     @InjectModel(WorkSession.name) private sessionModel: Model<WorkSession>,
     @InjectModel(User.name) private userModel: Model<User>,
+        @InjectModel(ConstructionSite.name) private siteModel: Model<ConstructionSite>, // Make sure Site is registered in your module!
+
   ) {}
 
   async checkIn(dto: CheckInDto) {
@@ -183,17 +186,13 @@ async checkInWithFace(photoBuffer: Buffer, siteId: string) {
   }
 
   async getMonthlySalary(workerId: string, year: number, month: number) {
-    // Get worker, including dailyWage
     const worker = await this.userModel.findById(workerId);
     if (!worker) throw new NotFoundException('Worker not found.');
     if (typeof worker.dailyWage !== 'number') throw new BadRequestException('Worker daily wage not set.');
 
-    // Calculate month range
-    // JS months: 0-indexed, but for Date use 1-indexed for easier calculations
     const from = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0, 0));
     const to = new Date(Date.UTC(year, month, 0, 23, 59, 59, 999)); // Last day of month
 
-    // Use your existing aggregation to get total hours
     const match: any = {
       worker: new mongoose.Types.ObjectId(workerId),
       checkIn: { $gte: from, $lte: to }
@@ -214,20 +213,168 @@ async checkInWithFace(photoBuffer: Buffer, siteId: string) {
       },
     ]);
 
-    // Sum all durations
     const totalHours = sessions.reduce((sum, s) => sum + (s.duration || 0), 0);
     const fullDays = totalHours / 8.0;
     const salary = fullDays * worker.dailyWage;
+    const roundedSalary = +salary.toFixed(2);
 
+    // Fix: If salary is less than 0.01, make it zero
     return {
       year,
       month,
       totalHours: +totalHours.toFixed(2),
       fullDays: +fullDays.toFixed(2),
       dailyWage: worker.dailyWage,
-      salary: +salary.toFixed(2)
+      salary: roundedSalary < 0.02 ? 0 : roundedSalary
     };
   }
+
+async getDashboardSummaryForOwner(ownerId: string) {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+    // 1. Get all sites owned by owner, include manager and workers
+    const sites = await this.siteModel.find({ owner: ownerId }).select('_id manager workers');
+
+    // 2. Collect all worker IDs (workers array + manager field)
+    const workerIdsSet = new Set<string>();
+    for (const site of sites) {
+        if (site.manager) workerIdsSet.add(site.manager.toString());
+        if (Array.isArray(site.workers)) {
+            for (const w of site.workers) workerIdsSet.add(w.toString());
+        }
+    }
+    const workerIds = Array.from(workerIdsSet);
+
+    // 3. Get all users (workers and managers) by ID who are active
+    const users = await this.userModel.find({
+      _id: { $in: workerIds },
+      role: { $in: ['worker', 'manager'] },
+      isActive: true
+    }).select('_id');
+    const filteredWorkerIds = users.map(w => w._id);
+    const totalWorkers = filteredWorkerIds.length;
+
+    // 4. Today's Attendance
+    const todayAttendanceAgg = await this.sessionModel.aggregate([
+      { $match: {
+          worker: { $in: filteredWorkerIds },
+          checkIn: { $gte: startOfToday, $lte: now }
+      }},
+      { $group: { _id: "$worker" } },
+      { $count: "presentCount" }
+    ]);
+    const presentTodayCount = todayAttendanceAgg[0]?.presentCount || 0;
+    const absentTodayCount = totalWorkers - presentTodayCount;
+    const todayAttendancePercent = totalWorkers === 0 ? 0 : Math.round((presentTodayCount / totalWorkers) * 100);
+
+    // 5. Monthly Attendance
+    const monthAttendanceAgg = await this.sessionModel.aggregate([
+      { $match: {
+          worker: { $in: filteredWorkerIds },
+          checkIn: { $gte: startOfMonth, $lte: endOfMonth }
+      }},
+      { $group: { _id: "$worker" } },
+      { $count: "presentCount" }
+    ]);
+    const presentMonthCount = monthAttendanceAgg[0]?.presentCount || 0;
+    const absentMonthCount = totalWorkers - presentMonthCount;
+    const monthAttendancePercent = totalWorkers === 0 ? 0 : Math.round((presentMonthCount / totalWorkers) * 100);
+
+    // 6. Weekly Trends (aggregation per day)
+    const weeklyTrend: { date: string, percent: number }[] = [];
+    for (let i = 6; i >= 0; i--) {
+      const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+      const dayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i + 1);
+
+      const dayAgg = await this.sessionModel.aggregate([
+        { $match: {
+            worker: { $in: filteredWorkerIds },
+            checkIn: { $gte: dayStart, $lt: dayEnd }
+        }},
+        { $group: { _id: "$worker" } },
+        { $count: "presentCount" }
+      ]);
+      const presentCount = dayAgg[0]?.presentCount || 0;
+      weeklyTrend.push({
+        date: dayStart.toISOString().slice(0, 10),
+        percent: totalWorkers === 0 ? 0 : Math.round((presentCount / totalWorkers) * 100)
+      });
+    }
+
+    return {
+      today: {
+        totalWorkers,
+        present: presentTodayCount,
+        absent: absentTodayCount,
+        percent: todayAttendancePercent
+      },
+      month: {
+        totalWorkers,
+        present: presentMonthCount,
+        absent: absentMonthCount,
+        percent: monthAttendancePercent
+      },
+      weeklyTrend
+    };
+}
+
+ async getSiteDailyAttendance(siteId: string) {
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    // Get the site document to find all workers and manager
+    const site = await this.siteModel.findById(siteId).select('workers manager');
+
+    // Collect all assigned user IDs (workers array + manager field)
+    const assignedUserIds = [
+      ...(site.workers ? site.workers.map(w => w.toString()) : []),
+      ...(site.manager ? [site.manager.toString()] : [])
+    ];
+
+    // Get user details (active, role worker or manager)
+    const users = await this.userModel.find({
+      _id: { $in: assignedUserIds },
+      role: { $in: ['worker', 'manager'] },
+      isActive: true
+    }).select('_id firstName lastName dailyWage workerCode');
+
+    const workerIds = users.map(u => u._id);
+
+    // Find sessions for today and this site
+    const presentSessions = await this.sessionModel.find({
+      worker: { $in: workerIds },
+      site: siteId,
+      checkIn: { $gte: startOfToday, $lte: now }
+    }).select('worker');
+    const presentWorkerIds = new Set(presentSessions.map(s => s.worker.toString()));
+
+    // Split present and absent users
+    const presentWorkers = users.filter(w => presentWorkerIds.has(w._id.toString()));
+    const absentWorkers = users.filter(w => !presentWorkerIds.has(w._id.toString()));
+
+    return {
+      siteId,
+      presentCount: presentWorkers.length,
+      absentCount: absentWorkers.length,
+      present: presentWorkers.map(w => ({
+        id: w._id,
+        name: `${w.firstName} ${w.lastName}`,
+        dailyWage: w.dailyWage,
+        workerCode: w.workerCode,
+      })),
+      absent: absentWorkers.map(w => ({
+        id: w._id,
+        name: `${w.firstName} ${w.lastName}`,
+        dailyWage: w.dailyWage,
+        workerCode: w.workerCode,
+      })),
+    };
+}
+  // Add this method to AttendanceService
+
 
    async testFastApiConnectivity() {
     try {
@@ -242,4 +389,37 @@ async checkInWithFace(photoBuffer: Buffer, siteId: string) {
       throw new InternalServerErrorException('Failed to connect to FastAPI.');
     }
   }
+async getTodayAttendanceForWorker(workerId: string) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  // Check worker exists
+  const worker = await this.userModel.findById(workerId).select('isActive');
+  if (!worker) throw new NotFoundException('Worker not found.');
+  if (!worker.isActive) throw new BadRequestException('Worker is not active.');
+
+  // Find today's session
+  const session = await this.sessionModel.findOne({
+    worker: worker._id,
+    checkIn: { $gte: startOfToday, $lte: now }
+  });
+
+  if (!session) {
+    return {
+      status: 'Absent',
+      checkIn: null,
+      checkOut: null
+    };
+  }
+
+  return {
+    status: session.checkOut ? 'Checked Out' : 'Present',
+    checkIn: session.checkIn,
+    checkOut: session.checkOut || null
+  };
+}
+
+
+
+  
 }

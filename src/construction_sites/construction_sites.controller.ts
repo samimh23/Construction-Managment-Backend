@@ -31,4 +31,9 @@ export class ConstructionSitesController {
   remove(@Param('id') id: string) {
     return this.constructionSitesService.remove(id);
   }
+
+  @Get('owner/:ownerId')
+  findByOwner(@Param('ownerId') ownerId: string) {
+    return this.constructionSitesService.findByOwner(ownerId);
+  }
 }

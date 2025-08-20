@@ -19,7 +19,7 @@ export class User extends Document  {
 
   @Prop({
     required: function(this: any) {
-      return this.role !== UserRole.WORKER;
+      return this.role !== UserRole.WORKER; 
     },
   })
   password: string;
@@ -65,10 +65,11 @@ export class User extends Document  {
 
   @Prop()
   passwordResetExpiry?: Date;
+  
+  @Prop({ default: false })
+  IsPresent?: boolean;
 
-  // Add company name here
-  @Prop()
-  company: string;
+
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

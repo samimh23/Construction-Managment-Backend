@@ -4,12 +4,14 @@ import { Model } from 'mongoose';
 import { ConstructionSite } from './Schemas/Construction_Site.schema';
 import { CreateConstructionSiteDto } from './dto/create-construction_site.dto';
 import { UpdateConstructionSiteDto } from './dto/update-construction_site.dto';
+import { User } from 'src/users/schema/user.schema';
 
 @Injectable()
 export class ConstructionSitesService {
   constructor(
     @InjectModel(ConstructionSite.name)
-    private readonly constructionSiteModel: Model<ConstructionSite>
+    private readonly constructionSiteModel: Model<ConstructionSite>,
+    @InjectModel(User.name) private userModel: Model<User>,
   ) {}
 
   async create(createConstructionSiteDto: CreateConstructionSiteDto): Promise<ConstructionSite> {
@@ -37,11 +39,25 @@ export class ConstructionSitesService {
     return updatedSite;
   }
 
-  async remove(id: string): Promise<ConstructionSite> {
-    const deletedSite = await this.constructionSiteModel.findByIdAndDelete(id).exec();
-    if (!deletedSite) {
-      throw new NotFoundException(`ConstructionSite #${id} not found`);
-    }
-    return deletedSite;
+ async remove(id: string): Promise<ConstructionSite> {
+  // Find the site first
+  const site = await this.constructionSiteModel.findById(id);
+  if (!site) {
+    throw new NotFoundException(`ConstructionSite #${id} not found`);
+  }
+
+  // Detach workers assigned to this site
+  await this.userModel.updateMany(
+    { assignedSite: site._id },
+    { $unset: { assignedSite: "" } } // or { $set: { assignedSite: null } }
+  );
+
+  // Delete the site
+  const deletedSite = await this.constructionSiteModel.findByIdAndDelete(id).exec();
+  return deletedSite;
+}
+
+   async findByOwner(ownerId: string): Promise<ConstructionSite[]> {
+    return this.constructionSiteModel.find({ owner: ownerId }).populate('owner', 'name').exec();
   }
 }
