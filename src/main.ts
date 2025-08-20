@@ -1,17 +1,9 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
-import multipart from '@fastify/multipart';
 
 async function bootstrap() {
-  // Print memory usage at boot for diagnostics
-  console.log('Memory usage at boot:', process.memoryUsage());
-
-  const app = await NestFactory.create<NestFastifyApplication>(
-    AppModule,
-    new FastifyAdapter()
-  );
+  const app = await NestFactory.create(AppModule);
 
   // Swagger config
   const config = new DocumentBuilder()
@@ -26,19 +18,10 @@ async function bootstrap() {
 
   // Enable CORS BEFORE listening!
   app.enableCors({
-    origin: true,
-    credentials: true,
+    origin: '*', // allow all origins; secure in production
   });
 
-  // Use dynamic port for cloud deployment, default to 3000
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-  await app.register(multipart as any, {
-  attachFieldsToBody: true // This helps you access fields from req.body
-});
 
-  await app.listen(port, '0.0.0.0'); // '0.0.0.0' is recommended for Fastify/Cloud
-  
-  console.log(`Server started on port ${port}`);
+  await app.listen(3000);
 }
-
 bootstrap();

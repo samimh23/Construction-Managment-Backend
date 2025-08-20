@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Query, Req, InternalServerErrorException } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, Req, InternalServerErrorException, Param } from '@nestjs/common';
 import { CheckInDto } from './dto/check-in.dto';
 import { CheckOutDto } from './dto/check-out.dto';
 import { AttendanceService } from './attendence.service';
@@ -105,4 +105,21 @@ async checkInWithFace(@Req() req: FastifyRequest) {
       throw new InternalServerErrorException('Failed to connect to FastAPI.');
     }
   }
+
+
+   @Get('dashboard-summary/owner')
+  async getDashboardSummaryForOwner(@Query('ownerId') ownerId: string) {
+    return this.attendanceService.getDashboardSummaryForOwner(ownerId);
+  }
+
+  @Get('site-daily-attendance')
+  async getSiteDailyAttendance(@Query('siteId') siteId: string) {
+    return this.attendanceService.getSiteDailyAttendance(siteId);
+  }
+
+  @Get('today/:workerId')
+async getTodayAttendanceForWorker(@Param('workerId') workerId: string) {
+  return this.attendanceService.getTodayAttendanceForWorker(workerId);
+}
+
 }
