@@ -1,9 +1,10 @@
-import { Controller, Post, Body, Get, Query, Req, InternalServerErrorException, Param } from '@nestjs/common';
+import { Controller, Post, Body, Get, Query, Req, InternalServerErrorException, Param, UseInterceptors, UploadedFile } from '@nestjs/common';
 import { CheckInDto } from './dto/check-in.dto';
 import { CheckOutDto } from './dto/check-out.dto';
 import { AttendanceService } from './attendence.service';
 import { FastifyRequest } from 'fastify';
 import axios from 'axios';
+import { FileInterceptor } from '@nestjs/platform-express';
 
 @Controller('attendance')
 export class AttendanceController {
@@ -34,50 +35,32 @@ export class AttendanceController {
 
   
   @Post('register-face')
-  async registerFace(@Req() req: FastifyRequest) {
-    const fileObj = (req.body as any).file;
-    const workerCodeObj = (req.body as any).workerCode;
-
-    if (!fileObj || !workerCodeObj?.value) {
-      throw new InternalServerErrorException('Missing file or workerCode');
+    @UseInterceptors(FileInterceptor('file'))
+    async registerFace(
+      @UploadedFile() file: Express.Multer.File,
+      @Body('workerCode') workerCode: string
+    ) {
+      return this.attendanceService.registerFace(workerCode, file.buffer);
     }
 
-    // Use toBuffer() for Fastify file
-    const fileBuffer = await fileObj.toBuffer();
 
-    return this.attendanceService.registerFace(workerCodeObj.value, fileBuffer);
-  }
-
- @Post('checkin-face')
-async checkInWithFace(@Req() req: FastifyRequest) {
-  const fileObj = (req.body as any).file;
-  const siteIdObj = (req.body as any).siteId;
-
-  if (!fileObj || !siteIdObj?.value) {
-    throw new InternalServerErrorException('Missing file or siteId');
-  }
-
-  // Use Fastify's built-in toBuffer
-  const fileBuffer = await fileObj.toBuffer();
-
-  console.log('buffer length:', fileBuffer.length);
-
-  return this.attendanceService.checkInWithFace(fileBuffer, siteIdObj.value);
-}
+    @Post('checkin-face')
+    @UseInterceptors(FileInterceptor('file'))
+    async checkInWithFace(
+      @UploadedFile() file: Express.Multer.File,
+      @Body('siteId') siteId: string
+    ) {
+      // siteId must be sent in the form-data
+      return this.attendanceService.checkInWithFace(file.buffer, siteId);
+    }
 
   @Post('checkout-face')
-  async checkOutWithFace(@Req() req: FastifyRequest) {
-    const fileObj = (req.body as any).file;
-
-    if (!fileObj) {
-      throw new InternalServerErrorException('Missing file');
+    @UseInterceptors(FileInterceptor('file'))
+    async checkOutWithFace(
+      @UploadedFile() file: Express.Multer.File
+    ) {
+      return this.attendanceService.checkOutWithFace(file.buffer);
     }
-
-    // Use toBuffer() for Fastify file
-    const fileBuffer = await fileObj.toBuffer();
-
-    return this.attendanceService.checkOutWithFace(fileBuffer);
-  }
 
  
   @Get('monthly-salary')

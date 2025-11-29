@@ -38,19 +38,24 @@ export class AttendanceService {
     });
   }
 
-  async checkOut(dto: CheckOutDto) {
-    const worker = await this.userModel.findOne({ workerCode: dto.workerCode });
-    if (!worker) throw new NotFoundException('Worker not found.');
+async checkOut(dto: CheckOutDto) {
+  const worker = await this.userModel.findOne({ workerCode: dto.workerCode });
+  if (!worker) throw new NotFoundException('Worker not found.');
 
-    const openSession = await this.sessionModel.findOne({
-      worker: worker._id,
-      checkOut: { $exists: false }
-    });
-    if (!openSession) throw new NotFoundException('No open session found.');
+  // Make sure dto.siteId is provided
+  if (!dto.siteId) throw new BadRequestException('siteId is required for check-out.');
 
-    openSession.checkOut = new Date();
-    return openSession.save();
-  }
+  // Find open session for this worker at this site
+  const openSession = await this.sessionModel.findOne({
+    worker: worker._id,
+    site: dto.siteId,
+    checkOut: { $exists: false }
+  });
+  if (!openSession) throw new NotFoundException('No open session found for this site.');
+
+  openSession.checkOut = new Date();
+  return openSession.save();
+}
 
   async getDailyWorkSummaryById(workerId: string, from?: Date, to?: Date) {
   const match: any = { worker: new mongoose.Types.ObjectId(workerId) };
@@ -85,6 +90,7 @@ export class AttendanceService {
 }
 
   async registerFace(workerCode: string, photoBuffer: Buffer) {
+    const FASTAPI_URL = process.env.FASTAPI_URL ;
     const worker = await this.userModel.findOne({ workerCode });
     if (!worker) throw new NotFoundException('Worker not found.');
     if (worker.faceRegistered) throw new BadRequestException('Face already registered.');
@@ -108,15 +114,11 @@ export class AttendanceService {
       throw new InternalServerErrorException('Failed to connect to FastAPI (register face).');
     }
   }
-
 async checkInWithFace(photoBuffer: Buffer, siteId: string) {
-  const FASTAPI_URL = process.env.FASTAPI_URL;
-  console.log('FASTAPI_URL:', FASTAPI_URL);
-  const url = `${FASTAPI_URL}/recognize/`;
-  console.log('Posting to:', url);
+      const FASTAPI_URL = process.env.FASTAPI_URL ;
+
     const form = new FormData();
     form.append('file', photoBuffer, { filename: 'face.jpg' });
-    
 
     try {
       const response = await axios.post(`${FASTAPI_URL}/recognize/`, form, {
@@ -144,17 +146,14 @@ async checkInWithFace(photoBuffer: Buffer, siteId: string) {
         site: siteId
       });
     } catch (error) {
-  console.error('AXIOS ERROR:', error?.response?.data || error.message || error);
-  throw new InternalServerErrorException('Failed to connect to FastAPI (face check-in): ' + (error?.response?.data?.detail || error.message));
-}
+      throw new InternalServerErrorException('Failed to connect to FastAPI (face check-in).');
+    }
   }
 
   /** Only photo needed for check-out */
-  async checkOutWithFace(photoBuffer: Buffer) {
-     const FASTAPI_URL = process.env.FASTAPI_URL;
-  console.log('FASTAPI_URL:', FASTAPI_URL);
-  const url = `${FASTAPI_URL}/recognize/`;
-  console.log('Posting to:', url);
+ async checkOutWithFace(photoBuffer: Buffer) {
+      const FASTAPI_URL = process.env.FASTAPI_URL ;
+
     const form = new FormData();
     form.append('file', photoBuffer, { filename: 'face.jpg' });
 
@@ -321,10 +320,9 @@ async getDashboardSummaryForOwner(ownerId: string) {
     };
 }
 
- async getSiteDailyAttendance(siteId: string) {
+async getSiteDailyAttendance(siteId: string) {
     const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
+const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     // Get the site document to find all workers and manager
     const site = await this.siteModel.findById(siteId).select('workers manager');
 
@@ -333,6 +331,7 @@ async getDashboardSummaryForOwner(ownerId: string) {
       ...(site.workers ? site.workers.map(w => w.toString()) : []),
       ...(site.manager ? [site.manager.toString()] : [])
     ];
+    console.log('Assigned User IDs:', assignedUserIds);
 
     // Get user details (active, role worker or manager)
     const users = await this.userModel.find({
@@ -340,6 +339,7 @@ async getDashboardSummaryForOwner(ownerId: string) {
       role: { $in: ['worker', 'manager'] },
       isActive: true
     }).select('_id firstName lastName dailyWage workerCode');
+    console.log('Active Users:', users);
 
     const workerIds = users.map(u => u._id);
 
@@ -349,11 +349,17 @@ async getDashboardSummaryForOwner(ownerId: string) {
       site: siteId,
       checkIn: { $gte: startOfToday, $lte: now }
     }).select('worker');
+    console.log('Present Sessions:', presentSessions);
+
     const presentWorkerIds = new Set(presentSessions.map(s => s.worker.toString()));
+    console.log('Present Worker IDs:', presentWorkerIds);
 
     // Split present and absent users
     const presentWorkers = users.filter(w => presentWorkerIds.has(w._id.toString()));
     const absentWorkers = users.filter(w => !presentWorkerIds.has(w._id.toString()));
+
+    console.log('Present Workers:', presentWorkers);
+    console.log('Absent Workers:', absentWorkers);
 
     return {
       siteId,
@@ -392,30 +398,43 @@ async getDashboardSummaryForOwner(ownerId: string) {
 async getTodayAttendanceForWorker(workerId: string) {
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const endOfToday = new Date(startOfToday);
+  endOfToday.setDate(endOfToday.getDate() + 1);
 
   // Check worker exists
   const worker = await this.userModel.findById(workerId).select('isActive');
   if (!worker) throw new NotFoundException('Worker not found.');
   if (!worker.isActive) throw new BadRequestException('Worker is not active.');
 
-  // Find today's session
-  const session = await this.sessionModel.findOne({
-    worker: worker._id,
-    checkIn: { $gte: startOfToday, $lte: now }
-  });
+  // Find ALL today's sessions (not just one)
+  const sessions = await this.sessionModel
+    .find({
+      worker: worker._id,
+      checkIn: { $gte: startOfToday, $lt: endOfToday }
+    })
+    .sort({ checkIn: 1 }); // Sort by check-in time ascending
 
-  if (!session) {
+  if (!sessions || sessions.length === 0) {
     return {
       status: 'Absent',
-      checkIn: null,
-      checkOut: null
+      sessions: []
     };
   }
 
-  return {
-    status: session.checkOut ? 'Checked Out' : 'Present',
+  // Map all sessions
+  const mappedSessions = sessions.map(session => ({
     checkIn: session.checkIn,
-    checkOut: session.checkOut || null
+    checkOut: session.checkOut || null,
+    status: session.checkOut ? 'Checked Out' : 'Present'
+  }));
+
+  // Overall status: if any session is still open (no checkOut), worker is Present
+  const hasOpenSession = sessions.some(s => !s.checkOut);
+  const status = hasOpenSession ? 'Present' : 'Checked Out';
+
+  return {
+    status,
+    sessions: mappedSessions
   };
 }
 

@@ -12,6 +12,7 @@ import { AuthModule } from './auth/auth.module';
 import { AttendenceModule } from './attendence/attendence.module';
 import { LocationModule } from './Locator/location.module';
 import { EmailModule } from './config/email.module';
+import { TasksModule } from './tasks/tasks.module';
 
   @Module({
     imports: [EmailModule, ConfigModule.forRoot({
@@ -46,7 +47,7 @@ import { EmailModule } from './config/email.module';
       inject: [ConfigService],
     })
 
-      ,AuthModule, UsersModule,ConstructionSitesModule, AttendenceModule, LocationModule],
+      ,AuthModule, UsersModule,ConstructionSitesModule, AttendenceModule, LocationModule, TasksModule],
     controllers: [AppController],
     providers: [AppService,],
   })

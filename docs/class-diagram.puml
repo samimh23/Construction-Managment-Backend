@@ -1,0 +1,312 @@
+@startuml Construction Management System
+
+' Styling
+skinparam classAttributeIconSize 0
+skinparam backgroundColor #FEFEFE
+skinparam class {
+    BackgroundColor<<Module>> LightBlue
+    BackgroundColor<<Controller>> LightGreen
+    BackgroundColor<<Service>> LightYellow
+    BackgroundColor<<Entity>> Pink
+    BackgroundColor<<DTO>> Wheat
+    BackgroundColor<<Enum>> Lavender
+}
+
+' ============================================
+' ENTITIES / SCHEMAS
+' ============================================
+
+class User <<Entity>> {
+    - _id: ObjectId
+    - name: string
+    - email: string
+    - password: string
+    - role: UserRole
+    - phoneNumber: string
+    - createdAt: Date
+    - updatedAt: Date
+}
+
+enum UserRole <<Enum>> {
+    OWNER
+    CONSTRUCTION_MANAGER
+    WORKER
+}
+
+class ConstructionSite <<Entity>> {
+    - _id: ObjectId
+    - name: string
+    - location: string
+    - description: string
+    - ownerId: ObjectId
+    - startDate: Date
+    - endDate: Date
+    - status: string
+    - createdAt: Date
+    - updatedAt: Date
+}
+
+class Task <<Entity>> {
+    - _id: ObjectId
+    - title: string
+    - description: string
+    - constructionSiteId: ObjectId
+    - status: TaskStatus
+    - priority: TaskPriority
+    - assignedWorkers: ObjectId[]
+    - startDate: Date
+    - dueDate: Date
+    - completedDate: Date
+    - progressPercentage: number
+    - estimatedHours: number
+    - actualHours: number
+    - notes: string
+    - createdBy: ObjectId
+    - createdAt: Date
+    - updatedAt: Date
+}
+
+enum TaskStatus <<Enum>> {
+    NOT_STARTED
+    IN_PROGRESS
+    ON_HOLD
+    COMPLETED
+    CANCELLED
+}
+
+enum TaskPriority <<Enum>> {
+    LOW
+    MEDIUM
+    HIGH
+    URGENT
+}
+
+class WorkSession <<Entity>> {
+    - _id: ObjectId
+    - workerId: ObjectId
+    - siteId: ObjectId
+    - checkInTime: Date
+    - checkOutTime: Date
+    - checkInLocation: Location
+    - checkOutLocation: Location
+    - totalHours: number
+    - status: string
+    - createdAt: Date
+    - updatedAt: Date
+}
+
+class Location <<Entity>> {
+    - latitude: number
+    - longitude: number
+    - address: string
+}
+
+class AccessCode <<Entity>> {
+    - _id: ObjectId
+    - code: string
+    - siteId: ObjectId
+    - isActive: boolean
+    - createdBy: ObjectId
+    - expiresAt: Date
+    - createdAt: Date
+    - updatedAt: Date
+}
+
+' ============================================
+' SERVICES
+' ============================================
+
+class UsersService <<Service>> {
+    - userModel: Model<User>
+    + create(dto: CreateUserDto): Promise<User>
+    + findAll(): Promise<User[]>
+    + findOne(id: string): Promise<User>
+    + findByEmail(email: string): Promise<User>
+    + update(id: string, dto: UpdateUserDto): Promise<User>
+    + remove(id: string): Promise<void>
+}
+
+class ConstructionSitesService <<Service>> {
+    - siteModel: Model<ConstructionSite>
+    + create(dto: CreateConstructionSiteDto): Promise<ConstructionSite>
+    + findAll(): Promise<ConstructionSite[]>
+    + findOne(id: string): Promise<ConstructionSite>
+    + findByOwner(ownerId: string): Promise<ConstructionSite[]>
+    + update(id: string, dto: UpdateConstructionSiteDto): Promise<ConstructionSite>
+    + remove(id: string): Promise<void>
+}
+
+class TasksService <<Service>> {
+    - taskModel: Model<Task>
+    + create(dto: CreateTaskDto, userId: string): Promise<Task>
+    + findAll(): Promise<Task[]>
+    + findOne(id: string): Promise<Task>
+    + findByConstructionSite(siteId: string): Promise<Task[]>
+    + findByWorker(workerId: string): Promise<Task[]>
+    + findByStatus(status: TaskStatus): Promise<Task[]>
+    + update(id: string, dto: UpdateTaskDto): Promise<Task>
+    + updateProgress(id: string, dto: UpdateProgressDto): Promise<Task>
+    + updateStatus(id: string, status: TaskStatus): Promise<Task>
+    + assignWorkers(id: string, workerIds: string[]): Promise<Task>
+    + remove(id: string): Promise<void>
+    + getOverdueTasks(): Promise<Task[]>
+    + getTaskStats(siteId?: string): Promise<Object>
+}
+
+class AttendanceService <<Service>> {
+    - workSessionModel: Model<WorkSession>
+    + checkIn(dto: CheckInDto): Promise<WorkSession>
+    + checkOut(dto: CheckOutDto): Promise<WorkSession>
+    + getDailyWorkSummaryById(workerId: string, from?: Date, to?: Date): Promise<Object>
+    + registerFace(workerCode: string, buffer: Buffer): Promise<Object>
+    + checkInWithFace(buffer: Buffer, siteId: string): Promise<WorkSession>
+}
+
+class AuthService <<Service>> {
+    - usersService: UsersService
+    - jwtService: JwtService
+    + signup(dto: CreateUserDto): Promise<Object>
+    + login(dto: LoginDto): Promise<Object>
+    + validateUser(email: string, password: string): Promise<User>
+    + generateToken(user: User): string
+}
+
+class CodesService <<Service>> {
+    - codeModel: Model<AccessCode>
+    + generateCode(siteId: string, userId: string): Promise<AccessCode>
+    + validateCode(code: string): Promise<boolean>
+    + getCodesBySite(siteId: string): Promise<AccessCode[]>
+}
+
+' ============================================
+' CONTROLLERS
+' ============================================
+
+class UsersController <<Controller>> {
+    - usersService: UsersService
+    + create(dto: CreateUserDto): Promise<User>
+    + findAll(): Promise<User[]>
+    + findOne(id: string): Promise<User>
+    + update(id: string, dto: UpdateUserDto): Promise<User>
+    + remove(id: string): Promise<void>
+}
+
+class ConstructionSitesController <<Controller>> {
+    - constructionSitesService: ConstructionSitesService
+    + create(dto: CreateConstructionSiteDto): Promise<ConstructionSite>
+    + findAll(): Promise<ConstructionSite[]>
+    + findOne(id: string): Promise<ConstructionSite>
+    + findByOwner(ownerId: string): Promise<ConstructionSite[]>
+    + update(id: string, dto: UpdateConstructionSiteDto): Promise<ConstructionSite>
+    + remove(id: string): Promise<void>
+}
+
+class TasksController <<Controller>> {
+    - tasksService: TasksService
+    + create(dto: CreateTaskDto): Promise<Task>
+    + findAll(): Promise<Task[]>
+    + findOne(id: string): Promise<Task>
+    + findByConstructionSite(siteId: string): Promise<Task[]>
+    + findByWorker(workerId: string): Promise<Task[]>
+    + findByStatus(status: TaskStatus): Promise<Task[]>
+    + update(id: string, dto: UpdateTaskDto): Promise<Task>
+    + updateProgress(id: string, dto: UpdateProgressDto): Promise<Task>
+    + updateStatus(id: string, status: TaskStatus): Promise<Task>
+    + assignWorkers(id: string, dto: AssignWorkersDto): Promise<Task>
+    + remove(id: string): Promise<void>
+    + getStats(siteId?: string): Promise<Object>
+    + getOverdueTasks(): Promise<Task[]>
+}
+
+class AttendanceController <<Controller>> {
+    - attendanceService: AttendanceService
+    + checkIn(dto: CheckInDto): Promise<WorkSession>
+    + checkOut(dto: CheckOutDto): Promise<WorkSession>
+    + getDailySummary(workerId: string, from?: string, to?: string): Promise<Object>
+    + registerFace(file: File, workerCode: string): Promise<Object>
+    + checkInWithFace(file: File, siteId: string): Promise<WorkSession>
+}
+
+class AuthController <<Controller>> {
+    - authService: AuthService
+    + signup(dto: CreateUserDto): Promise<Object>
+    + login(dto: LoginDto): Promise<Object>
+}
+
+' ============================================
+' GUARDS
+' ============================================
+
+class JwtAuthGuard {
+    - jwtService: JwtService
+    + canActivate(context: ExecutionContext): boolean
+}
+
+class RolesGuard {
+    - reflector: Reflector
+    - jwtService: JwtService
+    + canActivate(context: ExecutionContext): boolean
+}
+
+' ============================================
+' RELATIONSHIPS - Entities
+' ============================================
+
+User "1" -- "1" UserRole : has >
+ConstructionSite "1" -- "*" User : owned by >
+Task "1" -- "1" ConstructionSite : belongs to >
+Task "*" -- "*" User : assigned to >
+Task "1" -- "1" User : created by >
+Task "1" -- "1" TaskStatus : has >
+Task "1" -- "1" TaskPriority : has >
+WorkSession "1" -- "1" User : worker >
+WorkSession "1" -- "1" ConstructionSite : site >
+WorkSession "1" -- "2" Location : locations >
+AccessCode "1" -- "1" ConstructionSite : belongs to >
+AccessCode "1" -- "1" User : created by >
+
+' ============================================
+' RELATIONSHIPS - Services & Controllers
+' ============================================
+
+UsersController --> UsersService : uses >
+UsersService --> User : manages >
+
+ConstructionSitesController --> ConstructionSitesService : uses >
+ConstructionSitesService --> ConstructionSite : manages >
+
+TasksController --> TasksService : uses >
+TasksService --> Task : manages >
+
+AttendanceController --> AttendanceService : uses >
+AttendanceService --> WorkSession : manages >
+
+AuthController --> AuthService : uses >
+AuthService --> UsersService : uses >
+
+CodesService --> AccessCode : manages >
+
+' ============================================
+' RELATIONSHIPS - Guards
+' ============================================
+
+TasksController ..> JwtAuthGuard : protected by
+TasksController ..> RolesGuard : protected by
+ConstructionSitesController ..> JwtAuthGuard : protected by
+UsersController ..> JwtAuthGuard : protected by
+
+note right of TasksController
+  New Task Management Module
+  Handles CRUD operations,
+  worker assignments, and
+  progress tracking
+end note
+
+note right of Task
+  Core entity for tracking
+  construction tasks with
+  status, priority, progress,
+  and worker assignments
+end note
+
+@enduml

@@ -5,6 +5,5 @@ export class CheckInDto {
   workerCode: string;
 
   @IsString()
-  @IsOptional()
-  siteId?: string;
+  siteId: string;
 }
